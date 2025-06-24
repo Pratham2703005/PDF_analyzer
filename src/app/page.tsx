@@ -1,103 +1,211 @@
-import Image from "next/image";
+"use client"
 
-export default function Home() {
+import { useState, useEffect, useCallback, type JSX } from "react"
+import { usePdfExtractor } from "@/hooks/use-pdf-extractor"
+import { useTextChunker } from "@/hooks/use-text-chunker"
+import { useEmbeddings } from "@/hooks/use-embeddings"
+import { PdfUploadForm } from "@/components/pdf-upload-form"
+import { PdfViewer } from "@/components/pdf-viewer"
+import { ResultsPanel } from "@/components/results-panel"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Loader2, FileText, UploadCloud, CopyCheck, FolderOpen } from "lucide-react"
+import { copyToClipboard } from "@/lib/utils"
+import type { TextChunk } from "@/lib/types"
+
+export default function PDFAnalyzerPage(): JSX.Element {
+  // PDF extraction
+  const {
+    pdfJsLoaded,
+    isLoading: isExtracting,
+    error: extractionError,
+    fileName,
+    extractedText,
+    pdfDoc,
+    pdfFile,
+    extractTextFromPdf,
+    setError: setExtractionError,
+  } = usePdfExtractor()
+
+  // Text chunking
+  const { chunks, stats, isChunking, chunkText } = useTextChunker()
+
+  // Embeddings
+  const {
+    chunksWithEmbeddings,
+    isGenerating: isGeneratingEmbeddings,
+    error: embeddingError,
+    cacheInfo: embeddingCacheInfo,
+    generateEmbeddings,
+    clearEmbeddings,
+  } = useEmbeddings()
+
+  // UI state
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [currentPdfPage, setCurrentPdfPage] = useState<number>(1)
+  const [highlightInPdf, setHighlightInPdf] = useState<number | null>(null)
+  const [copySuccessMessage, setCopySuccessMessage] = useState<string>("")
+
+  // Auto-chunk when text is extracted
+  useEffect(() => {
+    if (extractedText && fileName && pdfDoc) {
+      chunkText(extractedText, fileName, pdfDoc.numPages)
+    }
+  }, [extractedText, fileName, pdfDoc, chunkText])
+
+  // Clear embeddings when new PDF is processed
+  useEffect(() => {
+    if (extractedText) {
+      clearEmbeddings()
+    }
+  }, [extractedText, clearEmbeddings])
+
+  useEffect(() => {
+    if (pdfFile) {
+      const objectUrl = URL.createObjectURL(pdfFile)
+      setPdfUrl(objectUrl)
+      setCurrentPdfPage(1)
+      return () => URL.revokeObjectURL(objectUrl)
+    }
+    setPdfUrl(null)
+  }, [pdfFile])
+
+  const handleFileSelect = useCallback(
+    (file: File) => {
+      if (file.type === "application/pdf") {
+        setExtractionError("")
+        extractTextFromPdf(file)
+      } else {
+        setExtractionError("Invalid file type. Please select a PDF.")
+      }
+    },
+    [extractTextFromPdf, setExtractionError],
+  )
+
+  const handleChunkClick = useCallback((chunk: TextChunk) => {
+    setHighlightInPdf(chunk.pageNumber)
+  }, [])
+
+  const handleCopyToClipboard = async (text: string) => {
+    const success = await copyToClipboard(text)
+    if (success) {
+      setCopySuccessMessage("Copied to clipboard!")
+      setTimeout(() => setCopySuccessMessage(""), 2000)
+    } else {
+      setCopySuccessMessage("Failed to copy.")
+      setTimeout(() => setCopySuccessMessage(""), 2000)
+    }
+  }
+
+  const isProcessing = isExtracting || isChunking
+
+const [showSuccess, setShowSuccess] = useState(false)
+
+useEffect(() => {
+  if (fileName && !isProcessing && !extractionError && extractedText) {
+    setShowSuccess(true)
+    const timer = setTimeout(() => setShowSuccess(false), 5000)
+    return () => clearTimeout(timer)
+  }
+}, [fileName, isProcessing, extractionError, extractedText])
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen bg-background text-foreground p-4 lg:p-6">
+      <header className="mb-6 text-center">
+        <h1 className="text-3xl font-bold mb-2">PDF Analyzer</h1>
+        <p className="text-muted-foreground">
+          Upload PDFs, extract text, generate semantic chunks, and create vector embeddings for analysis.
+        </p>
+        {!pdfJsLoaded && !extractionError && (
+          <p className="text-sm text-amber-600 dark:text-amber-400 mt-2 flex items-center justify-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading PDF processing library...
+          </p>
+        )}
+      </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <main className="grid lg:grid-cols-2 gap-6" style={{ height: "calc(100vh - 150px)" }}>
+        {/* Left Panel: Upload and PDF Exploration */}
+        <div className="flex flex-col gap-4">
+          {/* Upload Section */}
+          <Card className="flex-shrink-0">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UploadCloud className="w-5 h-5" /> Upload PDF
+              </CardTitle>
+              <CardDescription>Select or drag and drop your PDF files here.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PdfUploadForm onFileSelect={handleFileSelect} disabled={!pdfJsLoaded || isProcessing} />
+            </CardContent>
+          </Card>
+
+          {/* PDF Exploration Section */}
+          <Card className="flex-1 flex flex-col min-h-0">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FolderOpen className="w-5 h-5" /> Explore PDF
+              </CardTitle>
+              <CardDescription>
+                {fileName ? `Viewing: ${fileName}` : "PDF viewer will appear here after upload."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 min-h-0">
+                <PdfViewer
+                  pdfDoc={pdfDoc}
+                  fileUrl={pdfUrl}
+                  currentPage={currentPdfPage}
+                  onPageChange={setCurrentPdfPage}
+                  highlightPage={highlightInPdf}
+                />
+              </div>
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Right Panel: Results */}
+        <ResultsPanel
+          chunks={chunks}
+          stats={stats}
+          rawText={extractedText}
+          chunksWithEmbeddings={chunksWithEmbeddings}
+          isLoading={isExtracting}
+          isChunking={isChunking}
+          isGeneratingEmbeddings={isGeneratingEmbeddings}
+          embeddingError={embeddingError}
+          embeddingCacheInfo={embeddingCacheInfo}
+          onCopy={handleCopyToClipboard}
+          onChunkClick={handleChunkClick}
+          onGenerateEmbeddings={generateEmbeddings}
+          onClearEmbeddings={clearEmbeddings}
+        />
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+      {/* Error Alerts */}
+      {extractionError && (
+        <Alert variant="destructive" className="fixed bottom-4 right-4 w-auto max-w-md">
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{extractionError}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Success Messages */}
+      {copySuccessMessage && (
+        <Alert className="fixed bottom-4 left-4 w-auto bg-green-100 dark:bg-green-800 border-green-300 dark:border-green-600 text-green-700 dark:text-green-200">
+          <CopyCheck className="h-5 w-5 text-green-600 dark:text-green-300" />
+          <AlertDescription>{copySuccessMessage}</AlertDescription>
+        </Alert>
+      )}
+
+      {showSuccess && (
+        <Alert className="fixed bottom-16 right-4 w-auto max-w-md bg-blue-50 dark:bg-blue-900 border-blue-200 dark:border-blue-700">
+          <FileText className="h-5 w-5 text-blue-600 dark:text-blue-300" />
+          <AlertDescription className="text-blue-700 dark:text-blue-200">
+            Successfully processed: <strong>{fileName}</strong>.
+            {stats && `Found ${stats.totalChunks} chunks, ${stats.totalTokens} tokens.`}
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
-  );
+  )
 }

@@ -1,0 +1,26 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Chunks {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  chunkId    String   @unique // Reference to the original chunk ID
+  text       String
+  pageNumber Int
+  title      String
+  level      Int
+  tokenCount Int
+  wordCount  Int
+  embedding  Float[]  // embeddings must be Float[]
+  similarity Float    // similarity is a float like 0.95
+  fromCache  Boolean
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("chunks")
+}
