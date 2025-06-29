@@ -40,7 +40,7 @@ export function PdfViewer({ pdfDoc, fileUrl, currentPage, onPageChange, highligh
         const containerWidth = containerRef.current.clientWidth
         const unscaledViewport = page.getViewport({ scale: 1 })
         const scaleFactor = containerWidth / unscaledViewport.width
-        const viewport: PDFPageViewport = page.getViewport({ scale: scale * scaleFactor })
+        const viewport = page.getViewport({ scale });
 
         const canvas = canvasRef.current
         const ctx = canvas.getContext("2d")
