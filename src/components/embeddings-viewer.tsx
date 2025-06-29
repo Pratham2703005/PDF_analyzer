@@ -254,7 +254,7 @@ export function EmbeddingsViewer({
                 <Zap className="h-12 w-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
                 <p className="text-gray-600 dark:text-gray-400 mb-2">No embeddings generated yet</p>
                 <p className="text-sm text-gray-500 dark:text-gray-500">
-                  Click "Generate Embeddings" to process chunks
+                  Click &quot;Generate Embeddings&quot; to process chunks
                 </p>
                 <p className="text-xs text-gray-400 dark:text-gray-600 mt-1">
                   Large batches will be processed in smaller chunks for stability

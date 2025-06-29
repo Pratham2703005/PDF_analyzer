@@ -119,7 +119,6 @@ export function ResultsPanel({
                 batchInfo={embeddingBatchInfo}
                 onGenerateEmbeddings={onGenerateEmbeddings}
                 onClearEmbeddings={onClearEmbeddings}
-                onChunkClick={onChunkClick}
               />
             </TabsContent>
 

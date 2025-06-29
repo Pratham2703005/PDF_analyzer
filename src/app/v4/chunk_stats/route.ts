@@ -1,7 +1,7 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { ChunkService } from "@/lib/chunk-service"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const stats = await ChunkService.getChunkStats()
 

@@ -4,17 +4,14 @@ import { ChatInterface } from "./chat-interface"
 import { useChat } from "@/hooks/use-chat"
 import { Lock } from "lucide-react"
 import type { TextChunk } from "@/lib/types"
-import type { SummaryChunk } from "@/lib/services/summarization-service"
 
 interface ChatTabProps {
   enabled: boolean
   chunks: TextChunk[]
-  summaries: SummaryChunk[]
-  finalSummary: SummaryChunk | null
 }
 
-export function ChatTab({ enabled, chunks, summaries, finalSummary }: ChatTabProps) {
-  const { messages, isLoading, error, sendMessage, clearChat } = useChat(chunks)
+export function ChatTab({ enabled, chunks }: ChatTabProps) {
+  const { messages, isLoading, error, sendMessage } = useChat(chunks)
   
   if (!enabled) {
     return (

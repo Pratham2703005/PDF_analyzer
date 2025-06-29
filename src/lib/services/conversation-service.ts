@@ -106,11 +106,8 @@ Answer:`
    * Save conversation message to database
    */
   static async saveMessage(
-    conversationId: string,
     role: "user" | "assistant",
     content: string,
-    chunks?: TextChunk[],
-    similarity?: number,
   ): Promise<string> {
     try {
       const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -130,7 +127,7 @@ Answer:`
   /**
    * Get conversation history
    */
-  static async getConversationHistory(conversationId: string): Promise<ConversationMessage[]> {
+  static async getConversationHistory(): Promise<ConversationMessage[]> {
     // For now, return empty array - in production you'd fetch from database
     return []
   }

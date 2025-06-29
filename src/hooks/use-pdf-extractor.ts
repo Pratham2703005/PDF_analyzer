@@ -1,7 +1,9 @@
 "use client"
 
 import { useState, useCallback, useEffect } from "react"
-import type { PDFDocumentProxy, TextItem } from "@/lib/types"
+import type { TextItem } from "@/lib/types"
+import type { PDFDocumentProxy } from "pdfjs-dist";
+
 import type * as PDFJS from "pdfjs-dist"
 
 const PDFJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"

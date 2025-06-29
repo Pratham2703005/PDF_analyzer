@@ -42,8 +42,6 @@ export default function PDFAnalyzerPage() {
     chunksWithEmbeddings,
     isGenerating: isGeneratingEmbeddings,
     error: embeddingError,
-    cacheInfo: embeddingCacheInfo,
-    batchInfo: embeddingBatchInfo,
     generateEmbeddings,
     clearEmbeddings,
   } = useEmbeddings()
@@ -65,7 +63,6 @@ export default function PDFAnalyzerPage() {
   const [currentPdfPage, setCurrentPdfPage] = useState<number>(1)
   const [processingStep, setProcessingStep] = useState<ProcessingStep>("idle")
   const [processingProgress, setProcessingProgress] = useState(0)
-  const [isSavingToDatabase, setIsSavingToDatabase] = useState(false)
   const [chatEnabled, setChatEnabled] = useState(false)
   const [activeTab, setActiveTab] = useState("summary")
 
@@ -139,7 +136,6 @@ export default function PDFAnalyzerPage() {
   const saveSummariesToDatabase = async () => {
     if (!summaries.length && !finalSummary) return
 
-    setIsSavingToDatabase(true)
     try {
       const response = await fetch("/v4/save_summaries", {
         method: "POST",
@@ -165,8 +161,6 @@ export default function PDFAnalyzerPage() {
     } catch (error) {
       console.error("❌ Error saving summaries:", error)
       setProcessingStep("error")
-    } finally {
-      setIsSavingToDatabase(false)
     }
   }
 
@@ -322,8 +316,6 @@ export default function PDFAnalyzerPage() {
                 <ChatTab
                   enabled={chatEnabled}
                   chunks={chunksWithEmbeddings}
-                  summaries={summaries}
-                  finalSummary={finalSummary}
                 />
               </TabsContent>
             </Tabs>

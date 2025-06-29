@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import type { TextChunk } from "@/lib/types"
+import { pipeline } from "@xenova/transformers"
 
 export interface EmbeddingResult {
   chunkId: string
@@ -16,9 +17,11 @@ export class EmbeddingService {
   }> {
     const chunkIds = chunks.map((chunk) => chunk.id)
 
-    // Get existing embeddings
-    const existing = await prisma.embedding.findMany({
-      where: { chunkId: { in: chunkIds } },
+    // Get existing embeddings from DB
+    const existing = await prisma.chunks.findMany({
+      where: {
+        chunkId: { in: chunkIds },
+      },
     })
 
     const existingMap = new Map(existing.map((e) => [e.chunkId, e]))
@@ -28,8 +31,8 @@ export class EmbeddingService {
     for (const chunk of chunks) {
       const existingEmbedding = existingMap.get(chunk.id)
 
-      if (existingEmbedding) {
-        // Use cached embedding
+      if (existingEmbedding?.embedding?.length) {
+        // Use cached
         results.push({
           chunkId: chunk.id,
           embedding: existingEmbedding.embedding,
@@ -37,17 +40,29 @@ export class EmbeddingService {
           fromCache: true,
         })
       } else {
-        // Generate new embedding
+        // Generate new
         const embedding = await this.generateEmbedding(chunk.text)
         const similarity = Math.random() * 0.3 + 0.7
 
-        // Save to database
-        await prisma.embedding.create({
-          data: {
-            chunkId: chunk.id,
-            chunkText: chunk.text.substring(0, 1000),
+        // Save to DB
+        await prisma.chunks.upsert({
+          where: { chunkId: chunk.id },
+          update: {
             embedding,
             similarity,
+            fromCache: false,
+          },
+          create: {
+            chunkId: chunk.id,
+            text: chunk.text.substring(0, 1000),
+            pageNumber: chunk.pageNumber || 0,
+            title: chunk.title || "Untitled",
+            level: chunk.level || 0,
+            tokenCount: chunk.tokenCount || 0,
+            wordCount: chunk.wordCount || 0,
+            embedding,
+            similarity,
+            fromCache: false,
           },
         })
 
@@ -70,23 +85,19 @@ export class EmbeddingService {
   }
 
   private static async generateEmbedding(text: string): Promise<number[]> {
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 100 + Math.random() * 200))
-
-    // Generate fake 384-dimensional embedding
-    return Array.from({ length: 384 }, () => Math.random() * 2 - 1)
+    const extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2')
+    const output = await extractor(text, {
+      pooling: 'mean',
+      normalize: true,
+    })
+    return Array.from(output.data)
   }
 
   static async clearEmbeddings(chunkIds?: string[]): Promise<number> {
-    if (chunkIds) {
-      const result = await prisma.embedding.deleteMany({
-        where: { chunkId: { in: chunkIds } },
-      })
-      return result.count
-    } else {
-      const result = await prisma.embedding.deleteMany({})
-      return result.count
-    }
+    const result = await prisma.chunks.deleteMany({
+      where: chunkIds ? { chunkId: { in: chunkIds } } : {},
+    })
+    return result.count
   }
 
   static async getEmbeddingStats(): Promise<{
@@ -95,12 +106,12 @@ export class EmbeddingService {
     newestCreated: Date | null
   }> {
     const [total, oldest, newest] = await Promise.all([
-      prisma.embedding.count(),
-      prisma.embedding.findFirst({
+      prisma.chunks.count(),
+      prisma.chunks.findFirst({
         orderBy: { createdAt: "asc" },
         select: { createdAt: true },
       }),
-      prisma.embedding.findFirst({
+      prisma.chunks.findFirst({
         orderBy: { createdAt: "desc" },
         select: { createdAt: true },
       }),

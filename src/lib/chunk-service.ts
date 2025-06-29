@@ -116,13 +116,7 @@ export class ChunkService {
   }> {
     const [total, withEmbeddings, oldest, newest, avgSimilarity, allChunks] = await Promise.all([
       prisma.chunks.count(),
-      prisma.chunks.count({
-        where: {
-          embedding: {
-            not: null,
-          },
-        },
-      }),
+      prisma.chunks.count(),
       prisma.chunks.findFirst({
         orderBy: { createdAt: "asc" },
         select: { createdAt: true },
@@ -165,11 +159,6 @@ export class ChunkService {
     // Note: This is a simplified similarity search
     // In production, you'd want to use a vector database or implement proper cosine similarity
     const chunks = await prisma.chunks.findMany({
-      where: {
-        embedding: {
-          not: null,
-        },
-      },
       take: limit,
       orderBy: { similarity: "desc" },
     })

@@ -43,7 +43,6 @@ export function SummaryViewer({
   isGenerating,
   error,
   stats,
-  requiresApiKey,
   onGenerateSummaries,
   onClearSummaries,
   onCopyText,
@@ -338,7 +337,7 @@ export function SummaryViewer({
                 <Sparkles className="h-12 w-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
                 <p className="text-gray-600 dark:text-gray-400 mb-2">No summaries generated yet</p>
                 <p className="text-sm text-gray-500 dark:text-gray-500">
-                  Click "Generate Summary" to create AI-powered summaries
+                  Click &quot;Generate Summary&quot; to create AI-powered summaries
                 </p>
                 <p className="text-xs text-gray-400 dark:text-gray-600 mt-1">
                   Uses DistilBART • No API required • Private processing • Estimated time: ~
