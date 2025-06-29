@@ -19,17 +19,8 @@ export interface ChunkingStats {
   chunksByPage: { [key: number]: number }
 }
 
-export interface PDFDocumentProxy {
-  numPages: number
-  getPage: (pageNumber: number) => Promise<PDFPageProxy>
-  destroy: () => Promise<void>
-}
+export type { PDFDocumentProxy, PDFPageProxy, } from "pdfjs-dist/types/src/display/api";
 
-export interface PDFPageProxy {
-  getViewport: (arg: { scale: number }) => PDFPageViewport
-  getTextContent: () => Promise<{ items: TextItem[] }>
-  render: (arg: any) => any
-}
 
 export interface TextItem {
   str: string

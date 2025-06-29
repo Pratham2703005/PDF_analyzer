@@ -75,7 +75,7 @@ export function usePdfExtractor() {
           cMapUrl: CMAP_URL,
           cMapPacked: true,
         })
-        const loadedPdfDoc = (await loadingTask.promise)
+        const loadedPdfDoc = (await loadingTask.promise) as PDFType
         setPdfDoc(loadedPdfDoc)
 
         let fullText = ""
