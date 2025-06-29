@@ -79,7 +79,7 @@ export function useEmbeddings() {
     setCacheInfo(null)
     setBatchInfo(null)
   }, [])
-
+  
   return {
     chunksWithEmbeddings,
     isGenerating,

@@ -24,3 +24,24 @@ model Chunks {
 
   @@map("chunks")
 }
+
+model SummaryChunks {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  summaryId       String   @unique // Reference to the summary ID
+  title           String
+  text            String
+  pageNumber      Int
+  level           Int
+  tokenCount      Int
+  wordCount       Int
+  type            String   // "summary" or "final_summary"
+  sourceChunkIds  String[] // Array of source chunk IDs
+  summaryIndex    Int
+  embedding       Float[]  // embeddings for summaries
+  similarity      Float
+  fromCache       Boolean
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("summary_chunks")
+}

@@ -1,19 +1,26 @@
 "use client"
 
-import { useState, useEffect, useCallback, type JSX } from "react"
+import { useState, useEffect, useCallback } from "react"
+
 import { usePdfExtractor } from "@/hooks/use-pdf-extractor"
 import { useTextChunker } from "@/hooks/use-text-chunker"
 import { useEmbeddings } from "@/hooks/use-embeddings"
-import { PdfUploadForm } from "@/components/pdf-upload-form"
-import { PdfViewer } from "@/components/pdf-viewer"
-import { ResultsPanel } from "@/components/results-panel"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, FileText, UploadCloud, CopyCheck, FolderOpen } from "lucide-react"
-import { copyToClipboard } from "@/lib/utils"
-import type { TextChunk } from "@/lib/types"
+import { useSummarization } from "@/hooks/use-summarization"
 
-export default function PDFAnalyzerPage(): JSX.Element {
+import { PdfUploadSection } from "@/components/pdf-upload-section"
+import { PdfViewerSection } from "@/components/pdf-viewer-section"
+import { SummaryTab } from "@/components/summary-tab"
+import { ChatTab } from "@/components/chat-tab"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card } from "@/components/ui/card"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Progress } from "@/components/ui/progress"
+
+import { Loader2, MessageSquare, Sparkles, CheckCircle, AlertCircle } from "lucide-react"
+
+type ProcessingStep = "idle" | "extracting" | "chunking" | "summarizing" | "embedding" | "saving" | "complete" | "error"
+
+export default function PDFAnalyzerPage() {
   // PDF extraction
   const {
     pdfJsLoaded,
@@ -36,30 +43,69 @@ export default function PDFAnalyzerPage(): JSX.Element {
     isGenerating: isGeneratingEmbeddings,
     error: embeddingError,
     cacheInfo: embeddingCacheInfo,
+    batchInfo: embeddingBatchInfo,
     generateEmbeddings,
     clearEmbeddings,
   } = useEmbeddings()
 
+  // Summarization - using OpenAI by default
+  const {
+    summaries,
+    finalSummary,
+    isGenerating: isGeneratingSummaries,
+    error: summaryError,
+    requiresApiKey: summaryRequiresApiKey,
+    stats: summaryStats,
+    generateSummaries,
+    clearSummaries,
+  } = useSummarization()
+
   // UI state
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [currentPdfPage, setCurrentPdfPage] = useState<number>(1)
-  const [highlightInPdf, setHighlightInPdf] = useState<number | null>(null)
-  const [copySuccessMessage, setCopySuccessMessage] = useState<string>("")
+  const [processingStep, setProcessingStep] = useState<ProcessingStep>("idle")
+  const [processingProgress, setProcessingProgress] = useState(0)
+  const [isSavingToDatabase, setIsSavingToDatabase] = useState(false)
+  const [chatEnabled, setChatEnabled] = useState(false)
+  const [activeTab, setActiveTab] = useState("summary")
 
-  // Auto-chunk when text is extracted
+  // Auto-process when PDF is uploaded
   useEffect(() => {
-    if (extractedText && fileName && pdfDoc) {
+    if (extractedText && fileName && pdfDoc && processingStep === "extracting") {
+      setProcessingStep("chunking")
+      setProcessingProgress(25)
       chunkText(extractedText, fileName, pdfDoc.numPages)
     }
-  }, [extractedText, fileName, pdfDoc, chunkText])
+  }, [extractedText, fileName, pdfDoc, chunkText, processingStep])
 
-  // Clear embeddings when new PDF is processed
+  // Auto-generate summaries when chunks are ready
   useEffect(() => {
-    if (extractedText) {
-      clearEmbeddings()
+    if (chunks.length > 0 && processingStep === "chunking" && !isChunking) {
+      setProcessingStep("summarizing")
+      setProcessingProgress(40)
+      generateSummaries(chunks, "openai") // Always use OpenAI for speed
     }
-  }, [extractedText, clearEmbeddings])
+  }, [chunks, isChunking, processingStep, generateSummaries])
 
+  // Auto-generate embeddings when summaries are ready
+  useEffect(() => {
+    if ((summaries.length > 0 || finalSummary) && processingStep === "summarizing" && !isGeneratingSummaries) {
+      setProcessingStep("embedding")
+      setProcessingProgress(60)
+      generateEmbeddings(chunks)
+    }
+  }, [summaries, finalSummary, isGeneratingSummaries, processingStep, generateEmbeddings, chunks])
+
+  // Auto-save to database when embeddings are ready
+  useEffect(() => {
+    if (chunksWithEmbeddings.length > 0 && processingStep === "embedding" && !isGeneratingEmbeddings) {
+      setProcessingStep("saving")
+      setProcessingProgress(80)
+      saveSummariesToDatabase()
+    }
+  }, [chunksWithEmbeddings, isGeneratingEmbeddings, processingStep])
+
+  // Handle PDF file changes
   useEffect(() => {
     if (pdfFile) {
       const objectUrl = URL.createObjectURL(pdfFile)
@@ -70,140 +116,226 @@ export default function PDFAnalyzerPage(): JSX.Element {
     setPdfUrl(null)
   }, [pdfFile])
 
+  // Reset processing when new PDF is uploaded
+  useEffect(() => {
+    if (isExtracting) {
+      setProcessingStep("extracting")
+      setProcessingProgress(10)
+      setChatEnabled(false)
+      setActiveTab("summary")
+      clearEmbeddings()
+      clearSummaries()
+    }
+  }, [isExtracting, clearEmbeddings, clearSummaries])
+
+  // Handle errors
+  useEffect(() => {
+    if (extractionError || summaryError || embeddingError) {
+      setProcessingStep("error")
+      setProcessingProgress(0)
+    }
+  }, [extractionError, summaryError, embeddingError])
+
+  const saveSummariesToDatabase = async () => {
+    if (!summaries.length && !finalSummary) return
+
+    setIsSavingToDatabase(true)
+    try {
+      const response = await fetch("/v4/save_summaries", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          summaries,
+          finalSummary,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to save summaries to database")
+      }
+
+      const data = await response.json()
+      console.log("✅ Summaries saved to database:", data)
+
+      setProcessingStep("complete")
+      setProcessingProgress(100)
+      setChatEnabled(true)
+    } catch (error) {
+      console.error("❌ Error saving summaries:", error)
+      setProcessingStep("error")
+    } finally {
+      setIsSavingToDatabase(false)
+    }
+  }
+
   const handleFileSelect = useCallback(
     (file: File) => {
       if (file.type === "application/pdf") {
         setExtractionError("")
+        setProcessingStep("extracting")
+        setProcessingProgress(5)
         extractTextFromPdf(file)
       } else {
         setExtractionError("Invalid file type. Please select a PDF.")
+        setProcessingStep("error")
       }
     },
     [extractTextFromPdf, setExtractionError],
   )
 
-  const handleChunkClick = useCallback((chunk: TextChunk) => {
-    setHighlightInPdf(chunk.pageNumber)
-  }, [])
-
-  const handleCopyToClipboard = async (text: string) => {
-    const success = await copyToClipboard(text)
-    if (success) {
-      setCopySuccessMessage("Copied to clipboard!")
-      setTimeout(() => setCopySuccessMessage(""), 2000)
-    } else {
-      setCopySuccessMessage("Failed to copy.")
-      setTimeout(() => setCopySuccessMessage(""), 2000)
+  const handleRegenerateSummary = () => {
+    if (chunks.length > 0) {
+      clearSummaries()
+      setProcessingStep("summarizing")
+      setProcessingProgress(40)
+      generateSummaries(chunks, "openai")
     }
   }
 
-  const isProcessing = isExtracting || isChunking
-
-const [showSuccess, setShowSuccess] = useState(false)
-
-useEffect(() => {
-  if (fileName && !isProcessing && !extractionError && extractedText) {
-    setShowSuccess(true)
-    const timer = setTimeout(() => setShowSuccess(false), 5000)
-    return () => clearTimeout(timer)
+  const getProcessingMessage = () => {
+    switch (processingStep) {
+      case "extracting":
+        return "Extracting text from PDF..."
+      case "chunking":
+        return "Creating semantic chunks..."
+      case "summarizing":
+        return "Generating AI summaries with OpenAI GPT-4o-mini..."
+      case "embedding":
+        return "Creating vector embeddings for chat..."
+      case "saving":
+        return "Saving to database..."
+      case "complete":
+        return "Processing complete! Chat is now enabled."
+      case "error":
+        return "An error occurred during processing."
+      default:
+        return "Ready to process PDF"
+    }
   }
-}, [fileName, isProcessing, extractionError, extractedText])
+
+  const getProcessingIcon = () => {
+    switch (processingStep) {
+      case "complete":
+        return <CheckCircle className="h-5 w-5 text-green-600" />
+      case "error":
+        return <AlertCircle className="h-5 w-5 text-red-600" />
+      default:
+        return <Loader2 className="h-5 w-5 animate-spin" />
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-4 lg:p-6">
-      <header className="mb-6 text-center">
-        <h1 className="text-3xl font-bold mb-2">PDF Analyzer</h1>
-        <p className="text-muted-foreground">
-          Upload PDFs, extract text, generate semantic chunks, and create vector embeddings for analysis.
-        </p>
-        {!pdfJsLoaded && !extractionError && (
-          <p className="text-sm text-amber-600 dark:text-amber-400 mt-2 flex items-center justify-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading PDF processing library...
-          </p>
-        )}
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b bg-white dark:bg-gray-900">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">PDF Analyzer</h1>
+              <p className="text-sm text-muted-foreground">
+                Upload PDFs, generate summaries, and chat with your documents using AI
+              </p>
+            </div>
+            {fileName && (
+              <div className="text-right">
+                <p className="text-sm font-medium">{fileName}</p>
+                <p className="text-xs text-muted-foreground">
+                  {stats ? `${stats.totalChunks} chunks, ${stats.totalTokens} tokens` : "Processing..."}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </header>
 
-      <main className="grid lg:grid-cols-2 gap-6" style={{ height: "calc(100vh - 150px)" }}>
-        {/* Left Panel: Upload and PDF Exploration */}
-        <div className="flex flex-col gap-4">
-          {/* Upload Section */}
-          <Card className="flex-shrink-0">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <UploadCloud className="w-5 h-5" /> Upload PDF
-              </CardTitle>
-              <CardDescription>Select or drag and drop your PDF files here.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <PdfUploadForm onFileSelect={handleFileSelect} disabled={!pdfJsLoaded || isProcessing} />
-            </CardContent>
-          </Card>
-
-          {/* PDF Exploration Section */}
-          <Card className="flex-1 flex flex-col min-h-0">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FolderOpen className="w-5 h-5" /> Explore PDF
-              </CardTitle>
-              <CardDescription>
-                {fileName ? `Viewing: ${fileName}` : "PDF viewer will appear here after upload."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col overflow-hidden">
-              <div className="flex-1 min-h-0">
-                <PdfViewer
-                  pdfDoc={pdfDoc}
-                  fileUrl={pdfUrl}
-                  currentPage={currentPdfPage}
-                  onPageChange={setCurrentPdfPage}
-                  highlightPage={highlightInPdf}
-                />
+      {/* Processing Status */}
+      {processingStep !== "idle" && (
+        <div className="border-b bg-gray-50 dark:bg-gray-800">
+          <div className="container mx-auto px-4 py-3">
+            <div className="flex items-center gap-3">
+              {getProcessingIcon()}
+              <div className="flex-1">
+                <p className="text-sm font-medium">{getProcessingMessage()}</p>
+                <Progress value={processingProgress} className="mt-2 h-2" />
               </div>
-            </CardContent>
+              <div className="text-sm text-muted-foreground">{processingProgress}%</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-6">
+        <div className="grid lg:grid-cols-2 gap-6" style={{ height: "calc(100vh - 200px)" }}>
+          {/* Left Side - PDF Upload/Viewer */}
+          <div className="flex flex-col">
+            {!pdfFile ? (
+              <PdfUploadSection
+                onFileSelect={handleFileSelect}
+                disabled={!pdfJsLoaded || processingStep === "extracting"}
+                isLoading={!pdfJsLoaded}
+              />
+            ) : (
+              <PdfViewerSection
+                pdfDoc={pdfDoc}
+                fileUrl={pdfUrl}
+                currentPage={currentPdfPage}
+                onPageChange={setCurrentPdfPage}
+                fileName={fileName}
+              />
+            )}
+          </div>
+
+          {/* Right Side - Tabs */}
+          <Card className="flex flex-col">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
+              <div className="border-b px-6 pt-6 pb-0">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="summary" className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    Summary
+                  </TabsTrigger>
+                  <TabsTrigger value="chat" disabled={!chatEnabled} className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Chat {!chatEnabled && "(Processing...)"}
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+
+              <TabsContent value="summary" className="flex-1 overflow-hidden mt-0">
+                <SummaryTab
+                  chunks={chunks}
+                  summaries={summaries}
+                  finalSummary={finalSummary}
+                  isGenerating={isGeneratingSummaries}
+                  error={summaryError}
+                  stats={summaryStats}
+                  requiresApiKey={summaryRequiresApiKey}
+                  processingStep={processingStep}
+                  onRegenerateSummary={handleRegenerateSummary}
+                />
+              </TabsContent>
+
+              <TabsContent value="chat" className="flex-1 overflow-hidden mt-0">
+                <ChatTab
+                  enabled={chatEnabled}
+                  chunks={chunksWithEmbeddings}
+                  summaries={summaries}
+                  finalSummary={finalSummary}
+                />
+              </TabsContent>
+            </Tabs>
           </Card>
         </div>
-
-        {/* Right Panel: Results */}
-        <ResultsPanel
-          chunks={chunks}
-          stats={stats}
-          rawText={extractedText}
-          chunksWithEmbeddings={chunksWithEmbeddings}
-          isLoading={isExtracting}
-          isChunking={isChunking}
-          isGeneratingEmbeddings={isGeneratingEmbeddings}
-          embeddingError={embeddingError}
-          embeddingCacheInfo={embeddingCacheInfo}
-          onCopy={handleCopyToClipboard}
-          onChunkClick={handleChunkClick}
-          onGenerateEmbeddings={generateEmbeddings}
-          onClearEmbeddings={clearEmbeddings}
-        />
       </main>
 
       {/* Error Alerts */}
-      {extractionError && (
+      {(extractionError || summaryError || embeddingError) && (
         <Alert variant="destructive" className="fixed bottom-4 right-4 w-auto max-w-md">
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{extractionError}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Success Messages */}
-      {copySuccessMessage && (
-        <Alert className="fixed bottom-4 left-4 w-auto bg-green-100 dark:bg-green-800 border-green-300 dark:border-green-600 text-green-700 dark:text-green-200">
-          <CopyCheck className="h-5 w-5 text-green-600 dark:text-green-300" />
-          <AlertDescription>{copySuccessMessage}</AlertDescription>
-        </Alert>
-      )}
-
-      {showSuccess && (
-        <Alert className="fixed bottom-16 right-4 w-auto max-w-md bg-blue-50 dark:bg-blue-900 border-blue-200 dark:border-blue-700">
-          <FileText className="h-5 w-5 text-blue-600 dark:text-blue-300" />
-          <AlertDescription className="text-blue-700 dark:text-blue-200">
-            Successfully processed: <strong>{fileName}</strong>.
-            {stats && `Found ${stats.totalChunks} chunks, ${stats.totalTokens} tokens.`}
-          </AlertDescription>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{extractionError || summaryError || embeddingError}</AlertDescription>
         </Alert>
       )}
     </div>

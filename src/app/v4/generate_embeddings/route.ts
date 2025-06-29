@@ -83,7 +83,6 @@ async function processBatch(
   // Process new chunks sequentially to avoid overwhelming the model
   for (const chunk of newChunks) {
     try {
-      console.log(`Generating embedding for chunk: ${chunk.id}`)
       const embedding = await getEmbedding(chunk.text)
       const similarity = 1.0
 
@@ -127,8 +126,6 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
   try {
-    console.log("POST /v4/generate_embeddings called")
-
     const body: EmbeddingRequest = await request.json()
     const chunks = body.chunks
 
@@ -136,14 +133,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Invalid chunks data" }, { status: 400 })
     }
 
-    console.log(`Processing ${chunks.length} chunks`)
-
-    // Define batch size based on chunk count
     const BATCH_SIZE = chunks.length > 100 ? 20 : chunks.length > 50 ? 25 : 30
 
     // Create batches
     const batches = createBatches(chunks, BATCH_SIZE)
-    console.log(`Created ${batches.length} batches of size ${BATCH_SIZE}`)
 
     // Get existing chunks from database (do this once for all batches)
     const identifiers = chunks.map((c) => ({ title: c.title, text: c.text }))
@@ -152,8 +145,6 @@ export async function POST(request: NextRequest) {
         OR: identifiers.map((i) => ({ title: i.title, text: i.text })),
       },
     })
-
-    console.log(`Found ${existing.length} existing chunks in DB`)
 
     const existingMap = new Map(existing.map((e) => [`${e.title}|${e.text}`, e]))
 
@@ -164,7 +155,6 @@ export async function POST(request: NextRequest) {
 
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i]
-      console.log(`Processing batch ${i + 1}/${batches.length} (${batch.length} chunks)`)
 
       try {
         const batchResult = await processBatch(batch, existingMap)
@@ -172,8 +162,6 @@ export async function POST(request: NextRequest) {
         allProcessedChunks.push(...batchResult.processedChunks)
         totalFromCache += batchResult.fromCache
         totalNewlyGenerated += batchResult.newlyGenerated
-
-        console.log(`Batch ${i + 1} completed: ${batchResult.fromCache} cached, ${batchResult.newlyGenerated} new`)
 
         // Add delay between batches to prevent system overload
         if (i < batches.length - 1) {
@@ -190,7 +178,6 @@ export async function POST(request: NextRequest) {
     }
 
     const processingTime = Date.now() - startTime
-    console.log(`Total processing time: ${processingTime}ms`)
 
     return NextResponse.json({
       success: true,

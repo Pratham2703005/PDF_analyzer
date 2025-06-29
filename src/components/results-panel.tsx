@@ -2,13 +2,15 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Hash, FileText, Zap } from "lucide-react"
+import { Hash, FileText, Zap, Sparkles } from "lucide-react"
 import { ChunkList } from "./chunk-list"
 import { StatsDisplay } from "./stats-display"
 import { RawTextViewer } from "./raw-text-viewer"
 import { EmbeddingsViewer } from "./embeddings-viewer"
+import { SummaryViewer } from "./summary_viewer"
 import type { TextChunk, ChunkingStats } from "@/lib/types"
 import type { CacheInfo } from "@/hooks/use-embeddings"
+import type { SummaryChunk, SummarizationStats } from "@/lib/services/summarization-service"
 
 interface ResultsPanelProps {
   chunks: TextChunk[]
@@ -20,10 +22,23 @@ interface ResultsPanelProps {
   isGeneratingEmbeddings: boolean
   embeddingError: string
   embeddingCacheInfo: CacheInfo | null
+  embeddingBatchInfo?: {
+    totalBatches: number
+    batchSize: number
+    processingTime: number
+  }
+  summaries: SummaryChunk[]
+  finalSummary: SummaryChunk | null
+  isGeneratingSummaries: boolean
+  summaryError: string
+  summaryStats: SummarizationStats | null
+  summaryRequiresApiKey: boolean
   onCopy: (text: string) => void
   onChunkClick: (chunk: TextChunk) => void
   onGenerateEmbeddings: (chunks: TextChunk[]) => void
   onClearEmbeddings: () => void
+  onGenerateSummaries: (chunks: TextChunk[]) => void
+  onClearSummaries: () => void
 }
 
 export function ResultsPanel({
@@ -36,13 +51,23 @@ export function ResultsPanel({
   isGeneratingEmbeddings,
   embeddingError,
   embeddingCacheInfo,
+  embeddingBatchInfo,
+  summaries,
+  finalSummary,
+  isGeneratingSummaries,
+  summaryError,
+  summaryStats,
+  summaryRequiresApiKey,
   onCopy,
   onChunkClick,
   onGenerateEmbeddings,
   onClearEmbeddings,
+  onGenerateSummaries,
+  onClearSummaries,
 }: ResultsPanelProps) {
   const isProcessing = isLoading || isChunking
   const embeddingsCount = chunksWithEmbeddings.filter((chunk) => chunk.embedding).length
+  const summariesCount = summaries.length + (finalSummary ? 1 : 0)
 
   return (
     <Card className="flex flex-col h-full">
@@ -51,7 +76,9 @@ export function ResultsPanel({
           <Hash className="w-5 h-5" />
           Analysis Results
         </CardTitle>
-        <CardDescription>View extracted text, semantic chunks, embeddings, and processing statistics.</CardDescription>
+        <CardDescription>
+          View extracted text, semantic chunks, embeddings, AI summaries, and processing statistics.
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex-1 p-0 overflow-hidden">
         {isProcessing ? (
@@ -66,6 +93,10 @@ export function ResultsPanel({
               <TabsTrigger value="embeddings">
                 <Zap className="w-4 h-4 mr-1" />
                 Embeddings ({embeddingsCount})
+              </TabsTrigger>
+              <TabsTrigger value="summaries">
+                <Sparkles className="w-4 h-4 mr-1" />
+                Summaries ({summariesCount})
               </TabsTrigger>
               <TabsTrigger value="stats">Statistics</TabsTrigger>
             </TabsList>
@@ -85,8 +116,25 @@ export function ResultsPanel({
                 isGenerating={isGeneratingEmbeddings}
                 error={embeddingError}
                 cacheInfo={embeddingCacheInfo}
+                batchInfo={embeddingBatchInfo}
                 onGenerateEmbeddings={onGenerateEmbeddings}
                 onClearEmbeddings={onClearEmbeddings}
+                onChunkClick={onChunkClick}
+              />
+            </TabsContent>
+
+            <TabsContent value="summaries" className="flex-1 overflow-y-auto mt-0">
+              <SummaryViewer
+                chunks={chunks}
+                summaries={summaries}
+                finalSummary={finalSummary}
+                isGenerating={isGeneratingSummaries}
+                error={summaryError}
+                stats={summaryStats}
+                requiresApiKey={summaryRequiresApiKey}
+                onGenerateSummaries={onGenerateSummaries}
+                onClearSummaries={onClearSummaries}
+                onCopyText={onCopy}
               />
             </TabsContent>
 
