@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react"
 import type { TextItem } from "@/lib/types"
-import type { PDFDocumentProxy } from "pdfjs-dist";
+import type { PDFDocumentProxy as PDFType} from "@/lib/types"
 
 import type * as PDFJS from "pdfjs-dist"
 
@@ -16,7 +16,7 @@ export function usePdfExtractor() {
   const [error, setError] = useState("")
   const [fileName, setFileName] = useState("")
   const [extractedText, setExtractedText] = useState("")
-  const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null)
+  const [pdfDoc, setPdfDoc] = useState<PDFType | null>(null)
   const [pdfFile, setPdfFile] = useState<File | null>(null)
 
   useEffect(() => {
@@ -75,7 +75,7 @@ export function usePdfExtractor() {
           cMapUrl: CMAP_URL,
           cMapPacked: true,
         })
-        const loadedPdfDoc = (await loadingTask.promise) as PDFDocumentProxy
+        const loadedPdfDoc = (await loadingTask.promise)
         setPdfDoc(loadedPdfDoc)
 
         let fullText = ""
