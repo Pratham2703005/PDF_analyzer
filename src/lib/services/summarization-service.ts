@@ -3,6 +3,10 @@ import type { TextChunk } from "@/lib/types"
 import { pipeline } from "@xenova/transformers"
 import { prisma } from "@/lib/prisma"
 
+
+import { mistral } from '@ai-sdk/mistral';
+import { generateText } from 'ai';
+
 // Cache the summarization pipeline
 let summarizer: any = null
 
@@ -804,69 +808,53 @@ export class SummarizationService {
   /**
    * Summarize with OpenAI with better error handling
    */
-  private static async summarizeWithOpenAI(text: string, context: string): Promise<string> {
-    const maxInputTokens = this.MAX_TOKENS_PER_BATCH - 500 // Reserve tokens for output
-    const inputTokens = encode(text).length
+private static async summarizeWithOpenAI(text: string, context: string): Promise<string> {
+  const maxInputTokens = this.MAX_TOKENS_PER_BATCH - 500; // Reserve tokens for output
+  const inputTokens = encode(text).length;
 
-    let textToSummarize = text
-    if (inputTokens > maxInputTokens) {
-      const maxChars = Math.floor(maxInputTokens * 3.5) // Rough chars per token
-      textToSummarize = text.substring(0, maxChars) + "..."
-      console.log(`⚠️ Truncated input for ${context} from ${inputTokens} to ~${maxInputTokens} tokens`)
-    }
-
-    const prompt = `Please provide a comprehensive summary of the following text. Focus on the key points, main ideas, and important details. Make the summary clear, well-structured and (don't mention this: you have to make summary in under 400tokens):
-
-${textToSummarize}
-
-Summary:`
-
-    console.log(`🤖 Calling OpenAI GPT-4o-mini for ${context} (~${encode(textToSummarize).length} tokens)`)
-
-    try {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "user",
-              content: prompt,
-            },
-          ],
-          max_tokens: 500, // Conservative to stay within limits
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        const errorMessage = `OpenAI API error: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`
-
-        if (response.status === 429) {
-          console.error(`🚫 Rate limit hit for ${context}`)
-        }
-
-        throw new Error(errorMessage)
-      }
-
-      const data = await response.json()
-      const summaryText = data.choices?.[0]?.message?.content?.trim()
-
-      if (!summaryText || summaryText.length === 0) {
-        throw new Error("Empty response from OpenAI")
-      }
-
-      console.log(`📄 OpenAI Response for ${context}: "${summaryText.substring(0, 100)}..."`)
-      return summaryText
-    } catch (error) {
-      console.error(`❌ OpenAI error for ${context}:`, error)
-      throw error
-    }
+  let textToSummarize = text;
+  if (inputTokens > maxInputTokens) {
+    const maxChars = Math.floor(maxInputTokens * 3.5); // Rough chars per token
+    textToSummarize = text.substring(0, maxChars) + "...";
+    console.log(`⚠️ Truncated input for ${context} from ${inputTokens} to ~${maxInputTokens} tokens`);
   }
+
+  const prompt = `Please provide a comprehensive summary of the following text. Focus on the key points, main ideas, and important details. Make the summary clear, well-structured, under 300tokens(don't mention that in answer):
+
+${textToSummarize}`;
+
+  console.log(`🤖 Calling Mistral Large for ${context} (~${encode(textToSummarize).length} tokens)`);
+
+  try {
+    const { text: summaryText, usage } = await generateText({
+      model: mistral('mistral-large-latest'),
+      prompt,
+      maxTokens: 400, // Target ~400 tokens as mentioned in original prompt
+      temperature: 0.3, // Lower temperature for more consistent summaries
+    });
+
+    if (!summaryText || summaryText.length === 0) {
+      throw new Error("Empty response from OpenAI");
+    }
+
+    console.log(`📄 Mistral Response for ${context}: "${summaryText.substring(0, 100)}..."`);
+    console.log(`📊 Token usage - Input: ${usage.promptTokens}, Output: ${usage.completionTokens}, Total: ${usage.totalTokens}`);
+    
+    return summaryText;
+  } catch (error) {
+    console.error(`❌ Mistral error for ${context}:`, error);
+    
+    // Handle specific Vercel AI SDK errors
+    if (error.name === 'AI_APICallError') {
+      if (error.statusCode === 429) {
+        console.error(`🚫 Rate limit hit for ${context}`);
+      }
+      throw new Error(`Mistral API error: ${error.statusCode} - ${error.message}`);
+    }
+    
+    throw error;
+  }
+}
 
   /**
    * Summarize with local DistilBART

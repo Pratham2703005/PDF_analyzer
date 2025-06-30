@@ -1,3 +1,5 @@
+import { mistral } from '@ai-sdk/mistral';
+import { generateText } from 'ai';
 import { encode } from "gpt-tokenizer"
 import type { TextChunk } from "@/lib/types"
 
@@ -20,7 +22,7 @@ export interface ChatResponse {
 
 export class ConversationService {
   /**
-   * Generate answer using OpenAI with context chunks
+   * Generate answer using Mistral AI with context chunks
    */
   static async generateAnswer(
     question: string,
@@ -28,8 +30,8 @@ export class ConversationService {
     conversationHistory: ConversationMessage[] = [],
   ): Promise<string> {
     // Check if API key is available
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error("OpenAI API key is not configured")
+    if (!process.env.MISTRAL_API_KEY) {
+      throw new Error("Mistral API key is not configured")
     }
 
     // Prepare context from chunks
@@ -56,49 +58,39 @@ ${context}
 Question: ${question}
 Answer:`
 
+    console.log(`🤖 Calling Mistral AI for question: "${question.substring(0, 50)}..."`);
 
     try {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "user",
-              content: prompt,
-            },
-          ],
-          max_tokens: 400,
-          temperature: 0.3,
-        }),
-      })
+      const { text: answer, usage } = await generateText({
+        model: mistral('mistral-large-latest'),
+        prompt,
+        maxTokens: 400,
+        temperature: 0.3,
+      });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-
-        if (response.status === 401) {
-          throw new Error("Invalid OpenAI API key. Please check your OPENAI_API_KEY environment variable.")
-        }
-
-        throw new Error(`OpenAI API error: ${response.status} - ${JSON.stringify(errorData)}`)
+      if (!answer || answer.length === 0) {
+        throw new Error("Empty response from Mistral AI")
       }
 
-      const data = await response.json()
-      const answer = data.choices?.[0]?.message?.content?.trim()
-
-      if (!answer) {
-        throw new Error("Empty response from OpenAI")
-      }
-
-      console.log(`✅ Generated answer: "${answer.substring(0, 100)}..."`)
-      return answer
+      console.log(`✅ Generated answer: "${answer.substring(0, 100)}..."`);
+      console.log(`📊 Token usage - Input: ${usage.promptTokens}, Output: ${usage.completionTokens}, Total: ${usage.totalTokens}`);
+      
+      return answer;
     } catch (error) {
-      console.error("❌ Error generating answer:", error)
-      throw error
+      console.error("❌ Error generating answer:", error);
+      
+      // Handle specific Vercel AI SDK errors
+      if (error.name === 'AI_APICallError') {
+        if (error.statusCode === 401) {
+          throw new Error("Invalid Mistral API key. Please check your MISTRAL_API_KEY environment variable.");
+        }
+        if (error.statusCode === 429) {
+          console.error(`🚫 Rate limit hit for question generation`);
+        }
+        throw new Error(`Mistral API error: ${error.statusCode} - ${error.message}`);
+      }
+      
+      throw error;
     }
   }
 
