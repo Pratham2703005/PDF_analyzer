@@ -20,7 +20,7 @@ import { Loader2, MessageSquare, Sparkles, CheckCircle, AlertCircle } from "luci
 
 type ProcessingStep = "idle" | "extracting" | "chunking" | "summarizing" | "embedding" | "saving" | "complete" | "error"
 
-export default function PDFAnalyzerPage() {
+export default function Home() {
   // PDF extraction
   const {
     pdfJsLoaded,
