@@ -34,7 +34,7 @@ export function useSummarization() {
       try {
         console.log(`🚀 Starting summarization of ${chunks.length} chunks with ${modelToUse} model`)
 
-        const response = await fetch("/api/v4/summarize_chunks", {
+        const response = await fetch("https://pdf-analyzer-blond.vercel.app/api/v4/summarize_chunks", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
