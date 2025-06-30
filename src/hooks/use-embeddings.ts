@@ -34,7 +34,7 @@ export function useEmbeddings() {
     setBatchInfo(null)
 
     try {
-      const response = await fetch("/v4/generate_embeddings", {
+      const response = await fetch("https://pdf-analyzer-blond.vercel.app/api/v4/generate_embeddings", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
