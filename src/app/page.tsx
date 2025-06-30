@@ -137,7 +137,7 @@ export default function Home() {
     if (!summaries.length && !finalSummary) return
 
     try {
-      const response = await fetch("https://pdf-analyzer-blond.vercel.app/api/v4/save_summaries", {
+      const response = await fetch("api/v4/save_summaries", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

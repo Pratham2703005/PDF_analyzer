@@ -52,18 +52,18 @@ export async function POST(request: NextRequest) {
 
 
     // Perform summarization
-    // const result = await SummarizationService.summarizeChunks(validChunks, model)
-const result = {
-  summaries:'',
-  finalSummary:'',
-  totalProcessed:0,
-  processingSteps:0,
-  fromCache:0,
-  newlyGenerated:0,
-  model:''
+    const result = await SummarizationService.summarizeChunks(validChunks, model)
+// const result = {
+//   summaries:'',
+//   finalSummary:'',
+//   totalProcessed:0,
+//   processingSteps:0,
+//   fromCache:0,
+//   newlyGenerated:0,
+//   model:''
 
 
-};
+// };
     const processingTime = Date.now() - startTime
 
 

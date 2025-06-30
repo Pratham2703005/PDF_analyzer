@@ -33,7 +33,7 @@ export function useSummarization() {
 
       try {
 
-        const response = await fetch("https://pdf-analyzer-blond.vercel.app/api/v4/summarize_chunks", {
+        const response = await fetch("/api/v4/summarize_chunks", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
