@@ -164,7 +164,6 @@ export function useTextChunker() {
         setStats(null)
       }
     } catch (e) {
-      console.error("Failed to chunk text:", e)
       setChunks([])
       setStats(null)
     } finally {
