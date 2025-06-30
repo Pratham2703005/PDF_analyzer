@@ -32,7 +32,7 @@ export function useChat(chunks: TextChunk[]) {
       try {
 
         // Call the chat API
-        const response = await fetch("/api/chat", {
+        const response = await fetch("https://pdf-analyzer-blond.vercel.app/api/chat", {
           
           method: "POST",
           headers: {

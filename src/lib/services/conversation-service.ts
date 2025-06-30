@@ -109,7 +109,6 @@ Answer:`
    * Get conversation history
    */
   static async getConversationHistory(): Promise<ConversationMessage[]> {
-    // For now, return empty array - in production you'd fetch from database
     return []
   }
 
