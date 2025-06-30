@@ -153,13 +153,11 @@ export default function Home() {
       }
 
       const data = await response.json()
-      console.log("✅ Summaries saved to database:", data)
 
       setProcessingStep("complete")
       setProcessingProgress(100)
       setChatEnabled(true)
     } catch (error) {
-      console.error("❌ Error saving summaries:", error)
       setProcessingStep("error")
     }
   }

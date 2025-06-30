@@ -67,7 +67,6 @@ export function useEmbeddings() {
       setChunksWithEmbeddings([])
       setCacheInfo(null)
       setBatchInfo(null)
-      console.error("Embedding generation error:", err)
     } finally {
       setIsGenerating(false)
     }

@@ -32,7 +32,6 @@ export function useSummarization() {
       setStats(null)
 
       try {
-        console.log(`🚀 Starting summarization of ${chunks.length} chunks with ${modelToUse} model`)
 
         const response = await fetch("https://pdf-analyzer-blond.vercel.app/api/v4/summarize_chunks", {
           method: "POST",
@@ -61,7 +60,6 @@ export function useSummarization() {
           throw new Error(data.message || "Failed to generate summaries")
         }
 
-        console.log(`✅ Summarization completed:`, data.stats)
 
         setSummaries(data.summaries || [])
         setFinalSummary(data.finalSummary || null)
@@ -72,7 +70,6 @@ export function useSummarization() {
         setSummaries([])
         setFinalSummary(null)
         setStats(null)
-        console.error("❌ Summarization error:", err)
       } finally {
         setIsGenerating(false)
       }

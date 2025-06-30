@@ -58,7 +58,6 @@ ${context}
 Question: ${question}
 Answer:`
 
-    console.log(`🤖 Calling Mistral AI for question: "${question.substring(0, 50)}..."`);
 
     try {
       const { text: answer, usage } = await generateText({
@@ -72,20 +71,14 @@ Answer:`
         throw new Error("Empty response from Mistral AI")
       }
 
-      console.log(`✅ Generated answer: "${answer.substring(0, 100)}..."`);
-      console.log(`📊 Token usage - Input: ${usage.promptTokens}, Output: ${usage.completionTokens}, Total: ${usage.totalTokens}`);
       
       return answer;
     } catch (error) {
-      console.error("❌ Error generating answer:", error);
       
       // Handle specific Vercel AI SDK errors
       if (error.name === 'AI_APICallError') {
         if (error.statusCode === 401) {
           throw new Error("Invalid Mistral API key. Please check your MISTRAL_API_KEY environment variable.");
-        }
-        if (error.statusCode === 429) {
-          console.error(`🚫 Rate limit hit for question generation`);
         }
         throw new Error(`Mistral API error: ${error.statusCode} - ${error.message}`);
       }
@@ -105,13 +98,9 @@ Answer:`
       const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       const tokenCount = encode(content).length
 
-      // For now, we'll store in memory or use a simple approach
-      // In production, you'd want to use a proper conversation table
-      console.log(`💾 Saving ${role} message: "${content.substring(0, 50)}..." (${tokenCount} tokens)`)
 
       return messageId
     } catch (error) {
-      console.error("❌ Error saving message:", error)
       throw error
     }
   }

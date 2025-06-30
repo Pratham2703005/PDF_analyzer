@@ -33,7 +33,6 @@ export async function GET(request: NextRequest) {
     const chunks = await ChunkService.getAllChunks()
     return NextResponse.json({ success: true, chunks })
   } catch (error) {
-    console.error("Error getting chunks:", error)
     return NextResponse.json(
       {
         success: false,
@@ -60,7 +59,6 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, chunk: updatedChunk })
   } catch (error) {
-    console.error("Error updating chunk:", error)
     return NextResponse.json(
       {
         success: false,

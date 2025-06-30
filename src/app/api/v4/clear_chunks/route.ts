@@ -14,7 +14,6 @@ export async function DELETE(request: NextRequest) {
       deletedCount,
     })
   } catch (error) {
-    console.error("Error clearing chunks:", error)
     return NextResponse.json(
       {
         success: false,

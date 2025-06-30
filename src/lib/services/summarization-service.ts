@@ -13,13 +13,10 @@ let summarizer: any = null
 async function initializeSummarizer() {
   if (!summarizer) {
     try {
-      console.log("🤖 Initializing local summarization model...")
       summarizer = await pipeline("summarization", "Xenova/distilbart-cnn-12-6", {
         quantized: true,
       })
-      console.log("✅ Local summarization model initialized successfully")
     } catch (error) {
-      console.error("❌ Failed to initialize summarization model:", error)
       throw new Error(
         "Failed to initialize local summarization model. Please ensure you have a stable internet connection for the initial model download.",
       )
@@ -97,7 +94,6 @@ export class SummarizationService {
       this.tokenUsageTracker.tokensUsed = 0
       this.tokenUsageTracker.windowStart = now
       this.tokenUsageTracker.batchCount = 0
-      console.log("🔄 Token usage tracker reset - new 60s window started")
     }
   }
 
@@ -124,9 +120,7 @@ export class SummarizationService {
     this.resetTokenTrackerIfNeeded()
     this.tokenUsageTracker.tokensUsed += tokens
     this.tokenUsageTracker.batchCount++
-    console.log(
-      `📊 Token usage: ${this.tokenUsageTracker.tokensUsed}/${this.MAX_TOKENS_PER_MINUTE} in current window (batch ${this.tokenUsageTracker.batchCount})`,
-    )
+    
   }
 
   /**
@@ -144,12 +138,7 @@ export class SummarizationService {
     const delay = isEverySecondBatch ? this.DELAY_AFTER_TWO_BATCHES : this.DELAY_BETWEEN_REQUESTS
 
     if (batchIndex < totalBatches) {
-      // Not the last batch
-      if (isEverySecondBatch) {
-        console.log(`⏳ Waiting ${delay / 1000}s after 2 batches (throttling)...`)
-      } else {
-        console.log(`⏳ Waiting ${delay / 1000}s between OpenAI requests...`)
-      }
+     
       await new Promise((resolve) => setTimeout(resolve, delay))
     }
   }
@@ -196,7 +185,6 @@ export class SummarizationService {
       })
 
       if (cached) {
-        console.log(`📋 Found cached summary: ${cacheKey}`)
         return {
           id: cached.summaryId,
           title: cached.title,
@@ -257,7 +245,6 @@ export class SummarizationService {
         },
       })
 
-      console.log(`💾 Cached summary: ${cacheKey}`)
     } catch (error) {
       console.error("❌ Error saving to cache:", error)
     }
@@ -287,7 +274,6 @@ export class SummarizationService {
         if (model === "local") {
           throw error
         }
-        console.warn("⚠️ Local model initialization failed, will use OpenAI only")
       }
     }
 
@@ -321,7 +307,6 @@ export class SummarizationService {
       // Check cache first
       const cachedSummary = await this.getCachedSummary(cacheKey)
       if (cachedSummary) {
-        console.log(`🎯 Using cached final summary for single chunk`)
         return {
           summaries: [],
           finalSummary: {
@@ -341,7 +326,6 @@ export class SummarizationService {
       }
 
       try {
-        console.log(`🎯 Single chunk detected, creating direct final summary`)
         const { summaryText, modelUsed, hitRateLimit } = await this.summarizeTextWithFallback(
           chunk.text,
           "single_chunk",

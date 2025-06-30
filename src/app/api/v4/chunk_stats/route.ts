@@ -10,7 +10,6 @@ export async function GET() {
       stats,
     })
   } catch (error) {
-    console.error("Error getting chunk stats:", error)
     return NextResponse.json(
       {
         success: false,

@@ -28,9 +28,7 @@ let extractor: any = null
 
 async function getEmbedding(text: string): Promise<number[]> {
   if (!extractor) {
-    console.log("Loading embedding model...")
     extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2")
-    console.log("Embedding model loaded.")
   }
   const output = await extractor(text, { pooling: "mean", normalize: true })
   return Array.from(output.data)
@@ -114,7 +112,6 @@ async function processBatch(
       // Small delay to prevent overwhelming the system
       await new Promise((resolve) => setTimeout(resolve, 50))
     } catch (err) {
-      console.error(`Embedding error for chunk ${chunk.id}:`, err)
       processedChunks.push({ ...chunk, fromCache: false })
     }
   }
@@ -168,7 +165,6 @@ export async function POST(request: NextRequest) {
           await new Promise((resolve) => setTimeout(resolve, 200))
         }
       } catch (batchError) {
-        console.error(`Error processing batch ${i + 1}:`, batchError)
 
         // Add chunks from failed batch without embeddings
         batch.forEach((chunk) => {
@@ -192,7 +188,6 @@ export async function POST(request: NextRequest) {
       message: `Processed ${allProcessedChunks.length} chunks in ${batches.length} batches (${totalFromCache} from cache, ${totalNewlyGenerated} newly generated) in ${(processingTime / 1000).toFixed(2)}s`,
     })
   } catch (err) {
-    console.error("API Error:", err)
     return NextResponse.json(
       {
         success: false,

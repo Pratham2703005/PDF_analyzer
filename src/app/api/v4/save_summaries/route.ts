@@ -17,8 +17,6 @@ export interface SaveSummariesResponse {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("💾 POST /v4/save_summaries called")
-
     const body: SaveSummariesRequest = await request.json()
     const { summaries, finalSummary } = body
 
@@ -26,11 +24,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Invalid summaries data" }, { status: 400 })
     }
 
-    console.log(`💾 Saving ${summaries.length} summaries and ${finalSummary ? 1 : 0} final summary`)
 
     const result = await SummaryChunkService.saveSummaryChunks(summaries, finalSummary)
-
-    console.log(`✅ Save complete: ${result.totalSaved} items saved`)
 
     return NextResponse.json({
       success: true,
@@ -40,7 +35,6 @@ export async function POST(request: NextRequest) {
       totalSaved: result.totalSaved,
     })
   } catch (error) {
-    console.error("❌ Error saving summaries:", error)
     return NextResponse.json(
       {
         success: false,

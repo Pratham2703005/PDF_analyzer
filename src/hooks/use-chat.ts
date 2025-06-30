@@ -17,7 +17,6 @@ export function useChat(chunks: TextChunk[]) {
       setIsLoading(true)
       setError("")
 
-      console.log(`💬 useChat: Sending message "${question}" with ${chunks.length} chunks`)
 
       // Add user message immediately
       const userMessage: ConversationMessage = {
@@ -31,7 +30,6 @@ export function useChat(chunks: TextChunk[]) {
       setMessages((prev) => [...prev, userMessage])
 
       try {
-        console.log(`🚀 Making API call to /api/chat`)
 
         // Call the chat API
         const response = await fetch("https://pdf-analyzer-blond.vercel.app/api/chat", {
@@ -47,16 +45,13 @@ export function useChat(chunks: TextChunk[]) {
           }),
         })
 
-        console.log(`📡 API response status: ${response.status}`)
 
         if (!response.ok) {
           const errorText = await response.text()
-          console.error(`❌ API error response: ${errorText}`)
           throw new Error(`API request failed: ${response.status} ${response.statusText}`)
         }
 
         const data = await response.json()
-        console.log(`📦 API response data:`, data)
 
         if (!data.success) {
           throw new Error(data.error || "Failed to get response")
@@ -74,9 +69,7 @@ export function useChat(chunks: TextChunk[]) {
 
         setMessages((prev) => [...prev, assistantMessage])
 
-        console.log(`✅ Chat response received successfully`)
       } catch (err) {
-        console.error("❌ Chat error:", err)
         const errorMessage = err instanceof Error ? err.message : "Failed to generate response"
         setError(errorMessage)
 
