@@ -236,7 +236,14 @@ export default function Home() {
   const showErrorToast = !!firstError && !errorDismissed
 
   useEffect(() => {
-    toast.error(firstError || "An unknown error occurred during processing.")
+    toast.error({
+      message: firstError || "An unknown error occurred during processing.",
+      type: "error",
+      autoClose: 5000,
+      hideProgressBar: true,
+      robotVariant: "angry2",
+      theme: "dark"
+    })
   }, [firstError])
 
   return (
@@ -369,32 +376,6 @@ export default function Home() {
           </Card>
         </div>
       </main>
-
-      {showErrorToast && (
-        <div
-          role="alert"
-          className="fixed bottom-4 right-4 z-50 max-w-sm rounded-xl border border-destructive/30 bg-background shadow-lg animate-in slide-in-from-bottom-4 fade-in"
-        >
-          <div className="flex items-start gap-3 p-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/10 text-destructive shrink-0">
-              <AlertCircle className="h-4 w-4" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium">Processing error</p>
-              <p className="text-xs text-muted-foreground mt-0.5 break-words">{firstError}</p>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 shrink-0"
-              onClick={() => setErrorDismissed(true)}
-              aria-label="Dismiss"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
