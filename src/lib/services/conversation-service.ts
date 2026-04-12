@@ -66,7 +66,7 @@ Answer:`
 
     try {
       const { text: answer, usage } = await generateText({
-        model: nvidia(NVIDIA_MODEL_ID),
+        model: nvidia.chat(NVIDIA_MODEL_ID),
         prompt,
         maxTokens: 400,
         temperature: 0.3,
