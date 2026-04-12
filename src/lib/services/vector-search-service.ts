@@ -1,27 +1,10 @@
 import type { TextChunk } from "@/lib/types"
-import { pipeline } from "@xenova/transformers"
+import { createOpenAI } from "@ai-sdk/openai"
+import { embedMany } from "ai"
 
-// Cache the embedding model
-let embedder: any = null
-
-async function initializeEmbedder() {
-  if (!embedder) {
-    console.log("🔍 Initializing embedding model for search...")
-    try {
-      // Use the same model as in chunk-service.ts for consistency
-      embedder = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", {
-        quantized: true,
-        // Ensure models are loaded from CDN, not local paths
-        cache_dir: undefined,
-      })
-      console.log("✅ Embedding model ready for search")
-    } catch (error) {
-      console.error("❌ Failed to initialize embedding model:", error)
-      throw new Error("Failed to load embedding model. Please check your internet connection.")
-    }
-  }
-  return embedder
-}
+const openai = createOpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 /**
  * Calculate cosine similarity between two vectors
@@ -52,13 +35,17 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
 }
 
 /**
- * Generate embedding for a query
+ * Generate embedding for a query using OpenAI
  */
 export async function generateQueryEmbedding(query: string): Promise<number[]> {
   try {
-    const model = await initializeEmbedder()
-    const output = await model(query, { pooling: "mean", normalize: true })
-    return Array.from(output.data)
+    console.log("🔍 Generating query embedding using OpenAI...")
+    const result = await embedMany({
+      model: openai.embedding("text-embedding-3-small"),
+      values: [query],
+    })
+    console.log(`✅ Query embedding generated: ${result.embeddings[0].length} dimensions`)
+    return result.embeddings[0]
   } catch (error) {
     console.error("❌ Error generating query embedding:", error)
     throw new Error("Failed to generate embedding for query")

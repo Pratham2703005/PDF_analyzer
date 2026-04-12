@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/prisma"
 import type { TextChunk } from "@/lib/types"
-import { pipeline } from "@xenova/transformers"
+import { createOpenAI } from "@ai-sdk/openai";
+import { embedMany } from "ai"
+
+const openai = createOpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 export interface EmbeddingResult {
   chunkId: string
@@ -85,12 +90,16 @@ export class EmbeddingService {
   }
 
   private static async generateEmbedding(text: string): Promise<number[]> {
-    const extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2')
-    const output = await extractor(text, {
-      pooling: 'mean',
-      normalize: true,
-    })
-    return Array.from(output.data)
+    try {
+      const result = await embedMany({
+        model: openai.embedding("text-embedding-3-small"),
+        values: [text],
+      })
+      return result.embeddings[0]
+    } catch (error) {
+      console.error("Error generating embedding:", error)
+      throw new Error(`Failed to generate embedding: ${error instanceof Error ? error.message : String(error)}`)
+    }
   }
 
   static async clearEmbeddings(chunkIds?: string[]): Promise<number> {

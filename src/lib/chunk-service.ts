@@ -1,18 +1,5 @@
 import { prisma } from "@/lib/prisma"
 import type { TextChunk } from "@/lib/types"
-import { pipeline } from "@xenova/transformers"
-
-// Cache the extractor
-let extractor: any = null
-
-async function getEmbedding(text: string): Promise<number[]> {
-  if (!extractor) {
-    extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2")
-  }
-
-  const output = await extractor(text, { pooling: "mean", normalize: true })
-  return Array.from(output.data)
-}
 
 export class ChunkService {
   static async getOrCreateChunks(chunks: TextChunk[]): Promise<{
@@ -49,11 +36,11 @@ export class ChunkService {
           fromCache: true,
         })
       } else {
-        // Generate real embedding and store complete chunk
-        const embedding = await getEmbedding(chunk.text)
-        const similarity = 1.0
+        // Create chunk without embedding - embeddings will be generated separately
+        const embedding: number[] = []
+        const similarity = 0
 
-        // Save complete chunk to database
+        // Save chunk to database without embedding
         const savedChunk = await prisma.chunks.create({
           data: {
             chunkId: chunk.id, // Use chunkId field

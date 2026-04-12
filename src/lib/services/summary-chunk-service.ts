@@ -1,18 +1,5 @@
 import { prisma } from "@/lib/prisma"
 import type { SummaryChunk } from "./summarization-service"
-import { pipeline } from "@xenova/transformers"
-
-// Cache the extractor for embeddings
-let extractor: any = null
-
-async function getEmbedding(text: string): Promise<number[]> {
-  if (!extractor) {
-    extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2")
-  }
-
-  const output = await extractor(text, { pooling: "mean", normalize: true })
-  return Array.from(output.data)
-}
 
 export class SummaryChunkService {
   static async saveSummaryChunks(
@@ -31,9 +18,6 @@ export class SummaryChunkService {
     // Save intermediate summaries
     for (const summary of summaries) {
       try {
-        // Generate embedding for the summary
-        const embedding = await getEmbedding(summary.text)
-
         // Check if summary already exists
         const existing = await prisma.summaryChunks.findUnique({
           where: { summaryId: summary.id },

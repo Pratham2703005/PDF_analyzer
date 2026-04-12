@@ -1,6 +1,5 @@
 import { encode } from "gpt-tokenizer"
 import type { TextChunk } from "@/lib/types"
-import { pipeline } from "@xenova/transformers"
 import { prisma } from "@/lib/prisma"
 
 
@@ -14,23 +13,8 @@ const nvidia = createOpenAI({
 });
 const NVIDIA_MODEL_ID = process.env.NVIDIA_MODEL || 'meta/llama-3.3-70b-instruct';
 
-// Cache the summarization pipeline
-let summarizer: any = null
-
-async function initializeSummarizer() {
-  if (!summarizer) {
-    try {
-      summarizer = await pipeline("summarization", "Xenova/distilbart-cnn-12-6", {
-        quantized: true,
-      })
-    } catch (error) {
-      throw new Error(
-        "Failed to initialize local summarization model. Please ensure you have a stable internet connection for the initial model download.",
-      )
-    }
-  }
-  return summarizer
-}
+// Cache the summarization results
+let summaryCache: Map<string, string> = new Map()
 
 export interface SummaryChunk {
   id: string
@@ -274,15 +258,9 @@ export class SummarizationService {
     let rateLimitHit = false
     let fallbackUsed = false
 
-    // Initialize local model if needed (or as fallback)
-    if (model === "local" || model === "openai") {
-      try {
-        await initializeSummarizer()
-      } catch (error) {
-        if (model === "local") {
-          throw error
-        }
-      }
+    // Use API-based summarization only
+    if (model === "local") {
+      throw new Error("Local summarization model is deprecated. Please use 'openai' or specify an API-based model.");
     }
 
     let fromCache = 0
@@ -697,17 +675,17 @@ export class SummarizationService {
         const estimatedTokens = encode(text).length * 1.5 // Estimate input + output tokens
 
         if (!this.canMakeOpenAIRequest(estimatedTokens)) {
-          console.warn(`⚠️ Rate limit would be exceeded, falling back to local model for ${context}`)
+          console.warn(`⚠️ Rate limit would be exceeded, falling back to NVIDIA for ${context}`)
           hitRateLimit = true
-          const summaryText = await this.summarizeWithLocal(text, context)
-          return { summaryText, modelUsed: "local", hitRateLimit }
+          const summaryText = await this.summarizeWithOpenAI(text, context)
+          return { summaryText, modelUsed: "openai", hitRateLimit }
         }
 
         const summaryText = await this.summarizeWithOpenAI(text, context)
         this.trackTokenUsage(estimatedTokens)
         return { summaryText, modelUsed: "openai", hitRateLimit }
       } catch (error) {
-        console.error(`❌ OpenAI failed for ${context}, falling back to local:`, error)
+        console.error(`❌ OpenAI failed for ${context}, falling back to NVIDIA:`, error)
 
         if (error instanceof Error && (error.message.includes("429") || error.message.includes("rate limit"))) {
           hitRateLimit = true
@@ -715,12 +693,13 @@ export class SummarizationService {
           await new Promise((resolve) => setTimeout(resolve, this.DELAY_AFTER_RATE_LIMIT))
         }
 
-        const summaryText = await this.summarizeWithLocal(text, context)
-        return { summaryText, modelUsed: "local", hitRateLimit }
+        const summaryText = await this.summarizeWithOpenAI(text, context)
+        return { summaryText, modelUsed: "openai", hitRateLimit }
       }
     } else {
-      const summaryText = await this.summarizeWithLocal(text, context)
-      return { summaryText, modelUsed: "local", hitRateLimit }
+      // Use API-based summarization
+      const summaryText = await this.summarizeWithOpenAI(text, context)
+      return { summaryText, modelUsed: "openai", hitRateLimit }
     }
   }
 
@@ -846,37 +825,4 @@ ${textToSummarize}`;
     throw error;
   }
 }
-
-  /**
-   * Summarize with local DistilBART
-   */
-  private static async summarizeWithLocal(text: string, context: string): Promise<string> {
-    let textToSummarize = text
-    if (text.length > this.MAX_INPUT_LENGTH) {
-      textToSummarize = text.substring(0, this.MAX_INPUT_LENGTH - 3) + "..."
-      console.log(`⚠️ Truncated input for ${context} to fit local model limit`)
-    }
-
-    console.log(`🤖 Calling DistilBART for ${context} (~${textToSummarize.length} characters)`)
-
-    try {
-      const result = await summarizer(textToSummarize, {
-        min_length: this.MIN_LENGTH,
-        max_length: this.MAX_LENGTH,
-        do_sample: false,
-      })
-
-      const summaryText = result[0]?.summary_text || result.summary_text || ""
-
-      if (!summaryText || summaryText.trim().length === 0) {
-        throw new Error("Empty response from DistilBART model")
-      }
-
-      console.log(`📄 DistilBART Response for ${context}: "${summaryText.substring(0, 100)}..."`)
-      return summaryText.trim()
-    } catch (error) {
-      console.error(`❌ DistilBART error for ${context}:`, error)
-      throw error
-    }
-  }
 }
