@@ -36,7 +36,7 @@ export class SummaryChunkService {
               type: summary.type,
               sourceChunkIds: summary.sourceChunkIds,
               summaryIndex: summary.summaryIndex,
-              embedding,
+              embedding: [],
               similarity: 1.0,
               fromCache: false,
             },
@@ -57,9 +57,6 @@ export class SummaryChunkService {
     // Save final summary
     if (finalSummary) {
       try {
-        // Generate embedding for the final summary
-        const embedding = await getEmbedding(finalSummary.text)
-
         // Check if final summary already exists
         const existing = await prisma.summaryChunks.findUnique({
           where: { summaryId: finalSummary.id },
@@ -78,7 +75,7 @@ export class SummaryChunkService {
               type: finalSummary.type,
               sourceChunkIds: finalSummary.sourceChunkIds,
               summaryIndex: finalSummary.summaryIndex,
-              embedding,
+              embedding: [],
               similarity: 1.0,
               fromCache: false,
             },
