@@ -823,14 +823,14 @@ ${textToSummarize}`;
       prompt,
       maxTokens: 400,
       temperature: 0.3,
-    });
+    } as any);
 
     if (!summaryText || summaryText.length === 0) {
       throw new Error("Empty response from NVIDIA");
     }
 
     console.log(`📄 NVIDIA Response for ${context}: "${summaryText.substring(0, 100)}..."`);
-    console.log(`📊 Token usage - Input: ${usage.promptTokens}, Output: ${usage.completionTokens}, Total: ${usage.totalTokens}`);
+    console.log(`📊 Token usage - Input: ${usage.inputTokens}, Output: ${usage.outputTokens}, Total: ${usage.totalTokens}`);
 
     return summaryText;
   } catch (error: any) {

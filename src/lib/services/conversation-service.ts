@@ -70,7 +70,7 @@ Answer:`
         prompt,
         maxTokens: 400,
         temperature: 0.3,
-      });
+      } as any);
 
       if (!answer || answer.length === 0) {
         throw new Error("Empty response from NVIDIA")
