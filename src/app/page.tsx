@@ -236,14 +236,16 @@ export default function Home() {
   const showErrorToast = !!firstError && !errorDismissed
 
   useEffect(() => {
-    toast.error({
-      message: firstError || "An unknown error occurred during processing.",
-      type: "error",
-      autoClose: 5000,
-      hideProgressBar: true,
-      robotVariant: "angry2",
-      theme: "dark"
-    })
+    if(showErrorToast) {
+      toast.error({
+        message: firstError || "An unknown error occurred during processing.",
+        type: "error",
+        autoClose: 5000,
+        hideProgressBar: true,
+        robotVariant: "angry2",
+        theme: "dark"
+      })
+    }
   }, [firstError])
 
   return (
