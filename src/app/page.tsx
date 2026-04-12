@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { Sparkles, AlertCircle, FileText, X } from "lucide-react"
+import { toast } from "robot-toast";
 
 import { usePdfExtractor } from "@/hooks/use-pdf-extractor"
 import { useTextChunker } from "@/hooks/use-text-chunker"
@@ -233,6 +234,10 @@ export default function Home() {
 
   const firstError = extractionError || summaryError || embeddingError
   const showErrorToast = !!firstError && !errorDismissed
+
+  useEffect(() => {
+    toast.error(firstError || "An unknown error occurred during processing.")
+  }, [firstError])
 
   return (
     <div className="min-h-screen bg-background text-foreground">
