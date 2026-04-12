@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
           processingTime,
           fromCache: 0,
           newlyGenerated: 0,
-          model: "openai",
+          model: "mistral",
         },
       },
       { status: 500 },

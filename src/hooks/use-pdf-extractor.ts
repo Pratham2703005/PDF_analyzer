@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import type { TextItem } from "@/lib/types"
 import type { PDFDocumentProxy as PDFType} from "@/lib/types"
 
@@ -18,6 +18,11 @@ export function usePdfExtractor() {
   const [extractedText, setExtractedText] = useState("")
   const [pdfDoc, setPdfDoc] = useState<PDFType | null>(null)
   const [pdfFile, setPdfFile] = useState<File | null>(null)
+  const pdfDocRef = useRef<PDFType | null>(null)
+
+  useEffect(() => {
+    pdfDocRef.current = pdfDoc
+  }, [pdfDoc])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -47,6 +52,12 @@ export function usePdfExtractor() {
       })
     }
     loadPdfJs().catch((err) => setError(`Critical error: ${err.message}. Please refresh.`))
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      pdfDocRef.current?.destroy().catch(() => {})
+    }
   }, [])
 
   const extractTextFromPdf = useCallback(

@@ -1,5 +1,11 @@
-import { mistral } from '@ai-sdk/mistral';
+import { createOpenAI } from '@ai-sdk/openai';
 import { generateText } from 'ai';
+
+const nvidia = createOpenAI({
+  apiKey: process.env.NVIDIA_API_KEY,
+  baseURL: 'https://integrate.api.nvidia.com/v1',
+});
+const NVIDIA_MODEL_ID = process.env.NVIDIA_MODEL || 'meta/llama-3.3-70b-instruct';
 import { encode } from "gpt-tokenizer"
 import type { TextChunk } from "@/lib/types"
 
@@ -29,9 +35,8 @@ export class ConversationService {
     contextChunks: (TextChunk & { similarity: number })[],
     conversationHistory: ConversationMessage[] = [],
   ): Promise<string> {
-    // Check if API key is available
-    if (!process.env.MISTRAL_API_KEY) {
-      throw new Error("Mistral API key is not configured")
+    if (!process.env.NVIDIA_API_KEY) {
+      throw new Error("NVIDIA API key is not configured")
     }
 
     // Prepare context from chunks
@@ -61,14 +66,14 @@ Answer:`
 
     try {
       const { text: answer, usage } = await generateText({
-        model: mistral('mistral-large-latest'),
+        model: nvidia(NVIDIA_MODEL_ID),
         prompt,
         maxTokens: 400,
         temperature: 0.3,
       });
 
       if (!answer || answer.length === 0) {
-        throw new Error("Empty response from Mistral AI")
+        throw new Error("Empty response from NVIDIA")
       }
 
       
@@ -76,11 +81,12 @@ Answer:`
     } catch (error) {
       
       // Handle specific Vercel AI SDK errors
-      if (error.name === 'AI_APICallError') {
-        if (error.statusCode === 401) {
-          throw new Error("Invalid Mistral API key. Please check your MISTRAL_API_KEY environment variable.");
+      if ((error as any)?.name === 'AI_APICallError') {
+        const e = error as any;
+        if (e.statusCode === 401) {
+          throw new Error("Invalid NVIDIA API key. Please check your NVIDIA_API_KEY environment variable.");
         }
-        throw new Error(`Mistral API error: ${error.statusCode} - ${error.message}`);
+        throw new Error(`NVIDIA API error: ${e.statusCode} - ${e.message}`);
       }
       
       throw error;

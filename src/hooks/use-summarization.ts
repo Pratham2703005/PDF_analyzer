@@ -11,11 +11,10 @@ export function useSummarization() {
   const [error, setError] = useState("")
   const [requiresApiKey, setRequiresApiKey] = useState(false)
   const [stats, setStats] = useState<SummarizationStats | null>(null)
-  const [selectedModel, setSelectedModel] = useState<SummarizationModel>("openai")
 
   const generateSummaries = useCallback(
     async (chunks: TextChunk[], model?: SummarizationModel) => {
-      const modelToUse = model || selectedModel
+      const modelToUse = model || "openai"
 
       if (chunks.length === 0) {
         setSummaries([])
@@ -33,7 +32,7 @@ export function useSummarization() {
 
       try {
 
-        const response = await fetch("https://pdf-analyzer-blond.vercel.app/api/v4/summarize_chunks", {
+        const response = await fetch("/api/v4/summarize_chunks", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -74,7 +73,7 @@ export function useSummarization() {
         setIsGenerating(false)
       }
     },
-    [selectedModel],
+    [],
   )
 
   const clearSummaries = useCallback(() => {
@@ -92,8 +91,6 @@ export function useSummarization() {
     error,
     requiresApiKey,
     stats,
-    selectedModel,
-    setSelectedModel,
     generateSummaries,
     clearSummaries,
   }

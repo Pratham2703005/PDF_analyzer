@@ -1,22 +1,22 @@
 "use client"
 
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import {
   Loader2,
   FileText,
   AlertCircle,
-  CheckCircle,
-  Clock,
-  Layers,
   Sparkles,
   Copy,
-  Cpu,
-  Zap,
+  Layers,
+  Clock,
   Database,
 } from "lucide-react"
 import type { TextChunk } from "@/lib/types"
@@ -44,296 +44,179 @@ export function SummaryTab({
   stats,
   requiresApiKey,
   processingStep,
-  onRegenerateSummary,
 }: SummaryTabProps) {
-  const handleCopyText = async (text: string) => {
-    await copyToClipboard(text)
-  }
+  const busy = isGenerating || processingStep === "summarizing"
 
   if (chunks.length === 0 && processingStep === "idle") {
-    return (
-      <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400 p-6">
-        <div className="text-center">
-          <FileText className="h-16 w-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
-          <p className="text-lg mb-2">No PDF uploaded yet</p>
-          <p className="text-sm">Upload a PDF file to generate AI summaries</p>
-        </div>
-      </div>
-    )
+    return <EmptyState />
   }
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-6 border-b">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5" />
-            <span className="font-medium">AI Summary</span>
-          </div>
+      <ScrollArea className="flex-1">
+        <div className="p-6 space-y-5">
+          {busy && <LoadingState count={chunks.length} />}
 
-          {(summaries.length > 0 || finalSummary) && !isGenerating && (
-            <Button variant="outline" size="sm" onClick={onRegenerateSummary} className="text-xs">
-              Regenerate
-            </Button>
-          )}
-        </div>
-
-        {/* Processing Status */}
-        {(isGenerating || processingStep === "summarizing") && (
-          <Alert className="mb-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-            <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />
-            <AlertDescription className="text-blue-700 dark:text-blue-300">
-              <div className="space-y-2">
-                <p className="font-medium">Generating AI Summary with OpenAI GPT-4o-mini</p>
-                <p className="text-sm">Processing {chunks.length} chunks with smart rate limiting...</p>
-                <p className="text-xs">Fast processing • High quality results • Auto fallback to local model</p>
-              </div>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Error State */}
-        {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <div className="space-y-2">
-                <p className="font-medium">Summarization Error</p>
-                <p className="text-sm">{error}</p>
-                {requiresApiKey && (
-                  <div className="text-xs bg-red-50 dark:bg-red-900/20 p-2 rounded">
-                    <p className="font-medium">OpenAI API Issues:</p>
-                    <ul className="list-disc list-inside space-y-1 mt-1">
-                      <li>Ensure OPENAI_API_KEY is configured in environment variables</li>
-                      <li>Check if you have sufficient API credits</li>
-                      <li>System will automatically fallback to local model if needed</li>
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Success State */}
-        {(summaries.length > 0 || finalSummary) && !error && (
-          <Alert className="mb-4 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-            <AlertDescription className="text-green-700 dark:text-green-300">
-              Successfully generated AI summary using{" "}
-              {stats?.model === "openai" ? "OpenAI GPT-4o-mini" : "local DistilBART"}
-              {stats?.fallbackUsed && (
-                <span className="text-orange-600 dark:text-orange-400"> (with fallback to local model)</span>
-              )}
-              {stats?.rateLimitHit && (
-                <span className="text-yellow-600 dark:text-yellow-400"> (rate limit handled gracefully)</span>
-              )}
-              {stats && (
-                <div className="flex items-center gap-4 mt-2 text-sm">
-                  <div className="flex items-center gap-1">
-                    <FileText className="h-3 w-3" />
-                    {stats.totalProcessed} chunks processed
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Layers className="h-3 w-3" />
-                    {stats.processingSteps} steps
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {(stats.processingTime / 1000).toFixed(1)}s total
-                  </div>
-                  {stats.fromCache > 0 && (
-                    <div className="flex items-center gap-1">
-                      <Database className="h-3 w-3" />
-                      {stats.fromCache} cached
-                    </div>
+          {error && !busy && (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-4 w-4 mt-0.5 text-destructive" />
+                <div className="text-sm">
+                  <p className="font-medium text-destructive">Summarization failed</p>
+                  <p className="mt-1 text-muted-foreground">{error}</p>
+                  {requiresApiKey && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Check that <code className="px-1 py-0.5 bg-muted rounded">OPENAI_API_KEY</code> is set and has credits.
+                    </p>
                   )}
                 </div>
-              )}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Processing Info */}
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          {isGenerating || processingStep === "summarizing" ? (
-            <div className="space-y-1">
-              <div>Processing {chunks.length} chunks with OpenAI GPT-4o-mini...</div>
-              <div className="text-xs text-gray-500 dark:text-gray-500">
-                Smart rate limiting • Auto fallback • 90K tokens/min limit
               </div>
             </div>
-          ) : finalSummary ? (
-            <div className="space-y-1">
-              <div>Summary generated from {chunks.length} chunks</div>
-              <div className="text-xs text-gray-500 dark:text-gray-500">
-                Model: {stats?.model === "openai" ? "OpenAI GPT-4o-mini" : "DistilBART (Local)"} • Processing time:{" "}
-                {(stats?.processingTime || 0) / 1000}s •
-                {stats?.fromCache ? `${stats.fromCache} cached, ${stats.newlyGenerated} new` : "All new"}
-              </div>
-            </div>
-          ) : chunks.length > 0 ? (
-            <div className="space-y-1">
-              <div>Ready to summarize {chunks.length} chunks</div>
-              <div className="text-xs text-gray-500 dark:text-gray-500">
-                Will use OpenAI GPT-4o-mini for fast, high-quality summarization with smart rate limiting
-              </div>
-            </div>
-          ) : (
-            <div className="text-xs text-gray-500 dark:text-gray-500">Waiting for PDF processing to complete...</div>
           )}
-        </div>
-      </div>
 
-      <ScrollArea className="flex-1">
-        <div className="p-6 space-y-6">
-          {isGenerating || processingStep === "summarizing" ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-blue-500" />
-                <p className="text-lg font-medium mb-2">Generating AI Summary</p>
-                <p className="text-sm text-muted-foreground mb-4">OpenAI is analyzing your document...</p>
-                <div className="w-64 mx-auto">
-                  <div className="bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                    <div className="bg-blue-500 h-2 rounded-full animate-pulse" style={{ width: "60%" }} />
+          {!busy && finalSummary && (
+            <div className="rounded-2xl border bg-card p-6 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-semibold leading-tight">
+                      {finalSummary.title || "Document summary"}
+                    </h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Synthesized from {finalSummary.sourceChunkIds.length} chunks
+                    </p>
                   </div>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full"
+                  onClick={() => copyToClipboard(finalSummary.text)}
+                  aria-label="Copy summary"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
               </div>
-            </div>
-          ) : finalSummary || summaries.length > 0 ? (
-            <>
-              {/* Final Summary */}
-              {finalSummary && (
-                <Card className="border-2 border-blue-200 dark:border-blue-800">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-xl flex items-center gap-2">
-                        <Sparkles className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                        {finalSummary.title}
-                      </CardTitle>
-                      <div className="flex gap-2">
-                        <Badge
-                          variant="default"
-                          className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                        >
-                          Final Summary
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleCopyText(finalSummary.text)}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <Badge variant="outline" className="text-xs">
-                        {finalSummary.wordCount} words
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {finalSummary.tokenCount} tokens
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        From {finalSummary.sourceChunkIds.length} chunks
-                      </Badge>
-                      <Badge
-                        variant="outline"
-                        className="text-xs bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-300"
-                      >
-                        {stats?.model === "openai" ? (
-                          <>
-                            <Zap className="h-3 w-3 mr-1" />
-                            GPT-4o-mini
-                          </>
-                        ) : (
-                          <>
-                            <Cpu className="h-3 w-3 mr-1" />
-                            DistilBART
-                          </>
-                        )}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="prose prose-sm max-w-none dark:prose-invert">
-                      <div className="whitespace-pre-wrap leading-relaxed text-base">{finalSummary.text}</div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
 
-              {/* Intermediate Summaries */}
-              {summaries.length > 0 && (
-                <>
-                  <Separator />
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                      <Layers className="h-5 w-5" />
-                      Intermediate Summaries ({summaries.length})
-                    </h3>
-                    <div className="space-y-4">
-                      {summaries.map((summary) => (
-                        <Card key={summary.id} className="border border-gray-200 dark:border-gray-700">
-                          <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between">
-                              <CardTitle className="text-base">{summary.title}</CardTitle>
-                              <div className="flex gap-2">
-                                <Badge variant="secondary" className="text-xs">
-                                  Step {summary.level}
-                                </Badge>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleCopyText(summary.text)}
-                                  className="h-6 w-6 p-0"
-                                >
-                                  <Copy className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                              <Badge variant="outline" className="text-xs">
-                                {summary.wordCount} words
-                              </Badge>
-                              <Badge variant="outline" className="text-xs">
-                                {summary.tokenCount} tokens
-                              </Badge>
-                              <Badge variant="outline" className="text-xs">
-                                {summary.sourceChunkIds.length} source chunks
-                              </Badge>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="pt-2">
-                            <div className="text-sm leading-relaxed whitespace-pre-wrap">{summary.text}</div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-            </>
-          ) : chunks.length > 0 ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <Clock className="h-12 w-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
-                <p className="text-lg font-medium mb-2">Ready to Generate Summary</p>
-                <p className="text-sm text-muted-foreground">{chunks.length} chunks are ready for AI summarization</p>
+              <div className="mt-4 whitespace-pre-wrap leading-relaxed text-sm">
+                {finalSummary.text}
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center gap-1.5">
+                <StatBadge>{finalSummary.wordCount} words</StatBadge>
+                <StatBadge>{finalSummary.tokenCount} tokens</StatBadge>
+                {stats && <StatBadge>{stats.model === "openai" ? "GPT-4o-mini" : "DistilBART"}</StatBadge>}
+                {stats && (
+                  <StatBadge icon={<Clock className="h-3 w-3" />}>
+                    {(stats.processingTime / 1000).toFixed(1)}s
+                  </StatBadge>
+                )}
+                {stats && stats.fromCache > 0 && (
+                  <StatBadge icon={<Database className="h-3 w-3" />}>{stats.fromCache} cached</StatBadge>
+                )}
               </div>
             </div>
-          ) : (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
-                <p className="text-lg font-medium mb-2">Processing Document</p>
-                <p className="text-sm text-muted-foreground">Please wait while we extract and chunk your PDF...</p>
+          )}
+
+          {!busy && summaries.length > 0 && (
+            <div className="rounded-2xl border bg-card">
+              <div className="flex items-center gap-2 px-5 pt-4 pb-2">
+                <Layers className="h-4 w-4 text-muted-foreground" />
+                <h3 className="text-sm font-semibold">
+                  Intermediate summaries
+                  <span className="ml-1.5 text-muted-foreground font-normal">({summaries.length})</span>
+                </h3>
               </div>
+              <Accordion type="multiple" className="px-5 pb-2">
+                {summaries.map((s) => (
+                  <AccordionItem key={s.id} value={s.id}>
+                    <AccordionTrigger>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Badge variant="secondary" className="text-[10px]">
+                          L{s.level}
+                        </Badge>
+                        <span className="truncate">{s.title}</span>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                        {s.text}
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        <StatBadge>{s.wordCount} words</StatBadge>
+                        <StatBadge>{s.tokenCount} tokens</StatBadge>
+                        <StatBadge>{s.sourceChunkIds.length} sources</StatBadge>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
             </div>
+          )}
+
+          {!busy && !finalSummary && summaries.length === 0 && chunks.length > 0 && !error && (
+            <PendingState count={chunks.length} />
           )}
         </div>
       </ScrollArea>
+    </div>
+  )
+}
+
+function StatBadge({ children, icon }: { children: React.ReactNode; icon?: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-[10px] text-muted-foreground">
+      {icon}
+      {children}
+    </span>
+  )
+}
+
+function EmptyState() {
+  return (
+    <div className="flex items-center justify-center h-full p-6 text-muted-foreground">
+      <div className="text-center max-w-xs">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+          <FileText className="h-6 w-6" />
+        </div>
+        <p className="text-sm font-medium text-foreground">No document yet</p>
+        <p className="mt-1 text-xs">Upload a PDF to generate an AI summary here.</p>
+      </div>
+    </div>
+  )
+}
+
+function LoadingState({ count }: { count: number }) {
+  return (
+    <div className="rounded-2xl border bg-card p-6">
+      <div className="flex items-center gap-3">
+        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+        <div className="flex-1">
+          <p className="text-sm font-medium">Generating AI summary…</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Summarizing {count} chunks with smart rate limiting.
+          </p>
+        </div>
+      </div>
+      <div className="mt-5 space-y-2">
+        <div className="h-3 w-full rounded bg-muted animate-pulse" />
+        <div className="h-3 w-[92%] rounded bg-muted animate-pulse" />
+        <div className="h-3 w-[85%] rounded bg-muted animate-pulse" />
+        <div className="h-3 w-[70%] rounded bg-muted animate-pulse" />
+      </div>
+    </div>
+  )
+}
+
+function PendingState({ count }: { count: number }) {
+  return (
+    <div className="rounded-2xl border border-dashed p-6 text-center">
+      <Clock className="h-5 w-5 mx-auto text-muted-foreground" />
+      <p className="mt-2 text-sm font-medium">Ready to summarize</p>
+      <p className="text-xs text-muted-foreground">{count} chunks prepared.</p>
     </div>
   )
 }

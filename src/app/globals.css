@@ -120,3 +120,42 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes accordion-down {
+  from { height: 0; }
+  to { height: var(--radix-accordion-content-height); }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to { height: 0; }
+}
+@keyframes collapsible-down {
+  from { height: 0; }
+  to { height: var(--radix-collapsible-content-height); }
+}
+@keyframes collapsible-up {
+  from { height: var(--radix-collapsible-content-height); }
+  to { height: 0; }
+}
+.animate-accordion-down { animation: accordion-down 0.2s ease-out; }
+.animate-accordion-up { animation: accordion-up 0.2s ease-out; }
+
+/* Subtle radial mesh used on the empty-state upload surface */
+.bg-surface-mesh {
+  background-image:
+    radial-gradient(circle at 15% 15%, color-mix(in oklch, var(--primary) 10%, transparent), transparent 45%),
+    radial-gradient(circle at 85% 85%, color-mix(in oklch, var(--chart-1) 10%, transparent), transparent 50%),
+    radial-gradient(circle at 50% 50%, color-mix(in oklch, var(--chart-2) 6%, transparent), transparent 60%);
+}
+
+.dark .bg-surface-mesh {
+  background-image:
+    radial-gradient(circle at 15% 15%, color-mix(in oklch, var(--primary) 18%, transparent), transparent 45%),
+    radial-gradient(circle at 85% 85%, color-mix(in oklch, var(--chart-1) 14%, transparent), transparent 50%),
+    radial-gradient(circle at 50% 50%, color-mix(in oklch, var(--chart-2) 10%, transparent), transparent 60%);
+}
+
+/* Soft custom scrollbar */
+.thin-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.thin-scroll::-webkit-scrollbar-thumb { background: color-mix(in oklch, var(--muted-foreground) 35%, transparent); border-radius: 999px; }
+.thin-scroll::-webkit-scrollbar-track { background: transparent; }

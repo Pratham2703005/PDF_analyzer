@@ -4,8 +4,15 @@ import { pipeline } from "@xenova/transformers"
 import { prisma } from "@/lib/prisma"
 
 
-import { mistral } from '@ai-sdk/mistral';
+import { createOpenAI } from '@ai-sdk/openai';
 import { generateText } from 'ai';
+
+// NVIDIA NIM is OpenAI-compatible. Override model via NVIDIA_MODEL env.
+const nvidia = createOpenAI({
+  apiKey: process.env.NVIDIA_API_KEY,
+  baseURL: 'https://integrate.api.nvidia.com/v1',
+});
+const NVIDIA_MODEL_ID = process.env.NVIDIA_MODEL || 'meta/llama-3.3-70b-instruct';
 
 // Cache the summarization pipeline
 let summarizer: any = null
@@ -66,16 +73,17 @@ export type SummarizationModel = "openai" | "local"
 
 export class SummarizationService {
   // Updated limits as per your requirements
-  private static readonly MAX_TOKENS_PER_BATCH = 1500 // Conservative batch size
-  private static readonly MAX_TOKENS_PER_MINUTE = 90000 // 90K tokens per 60s window
+  // Tuned for NVIDIA NIM (Llama 3.3 70B, 128K ctx). Override via env if needed.
+  private static readonly MAX_TOKENS_PER_BATCH = 6000
+  private static readonly MAX_TOKENS_PER_MINUTE = 400000
   private static readonly MAX_INPUT_LENGTH = 1024 // DistilBART max input length
   private static readonly MIN_LENGTH = 200
   private static readonly MAX_LENGTH = 500
   private static readonly MAX_RETRIES = 2
-  private static readonly DELAY_BETWEEN_REQUESTS = 3000 // 3s between requests
-  private static readonly DELAY_AFTER_TWO_BATCHES = 6000 // 6s after every 2 batches
-  private static readonly DELAY_AFTER_RATE_LIMIT = 5000 // 5s after rate limit
-  private static readonly LARGE_BATCH_THRESHOLD = 5 // Sequential processing for >5 batches
+  private static readonly DELAY_BETWEEN_REQUESTS = 800
+  private static readonly DELAY_AFTER_TWO_BATCHES = 1500
+  private static readonly DELAY_AFTER_RATE_LIMIT = 5000
+  private static readonly LARGE_BATCH_THRESHOLD = 20
 
   // Track token usage to avoid rate limits
   private static tokenUsageTracker = {
@@ -798,7 +806,7 @@ private static async summarizeWithOpenAI(text: string, context: string): Promise
 
   let textToSummarize = text;
   if (inputTokens > maxInputTokens) {
-    const maxChars = Math.floor(maxInputTokens * 3.5); // Rough chars per token
+    const maxChars = Math.floor(maxInputTokens * 3.5);
     textToSummarize = text.substring(0, maxChars) + "...";
     console.log(`⚠️ Truncated input for ${context} from ${inputTokens} to ~${maxInputTokens} tokens`);
   }
@@ -807,35 +815,34 @@ private static async summarizeWithOpenAI(text: string, context: string): Promise
 
 ${textToSummarize}`;
 
-  console.log(`🤖 Calling Mistral Large for ${context} (~${encode(textToSummarize).length} tokens)`);
+  console.log(`🤖 Calling NVIDIA (${NVIDIA_MODEL_ID}) for ${context} (~${encode(textToSummarize).length} tokens)`);
 
   try {
     const { text: summaryText, usage } = await generateText({
-      model: mistral('mistral-large-latest'),
+      model: nvidia(NVIDIA_MODEL_ID),
       prompt,
-      maxTokens: 400, // Target ~400 tokens as mentioned in original prompt
-      temperature: 0.3, // Lower temperature for more consistent summaries
+      maxTokens: 400,
+      temperature: 0.3,
     });
 
     if (!summaryText || summaryText.length === 0) {
-      throw new Error("Empty response from OpenAI");
+      throw new Error("Empty response from NVIDIA");
     }
 
-    console.log(`📄 Mistral Response for ${context}: "${summaryText.substring(0, 100)}..."`);
+    console.log(`📄 NVIDIA Response for ${context}: "${summaryText.substring(0, 100)}..."`);
     console.log(`📊 Token usage - Input: ${usage.promptTokens}, Output: ${usage.completionTokens}, Total: ${usage.totalTokens}`);
-    
+
     return summaryText;
-  } catch (error) {
-    console.error(`❌ Mistral error for ${context}:`, error);
-    
-    // Handle specific Vercel AI SDK errors
-    if (error.name === 'AI_APICallError') {
+  } catch (error: any) {
+    console.error(`❌ NVIDIA error for ${context}:`, error);
+
+    if (error?.name === 'AI_APICallError') {
       if (error.statusCode === 429) {
         console.error(`🚫 Rate limit hit for ${context}`);
       }
-      throw new Error(`Mistral API error: ${error.statusCode} - ${error.message}`);
+      throw new Error(`NVIDIA API error: ${error.statusCode} - ${error.message}`);
     }
-    
+
     throw error;
   }
 }
