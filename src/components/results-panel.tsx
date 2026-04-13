@@ -101,15 +101,15 @@ export function ResultsPanel({
               <TabsTrigger value="stats">Statistics</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="raw" className="flex-1 overflow-y-auto mt-0">
+            <TabsContent value="raw" className="flex-1 h-full overflow-y-auto mt-0">
               <RawTextViewer rawText={rawText} onCopyAll={onCopy} />
             </TabsContent>
 
-            <TabsContent value="chunks" className="flex-1 overflow-y-auto mt-0">
+            <TabsContent value="chunks" className="flex-1 h-full overflow-y-auto mt-0">
               <ChunkList chunks={chunks} onCopyChunk={onCopy} onChunkClick={onChunkClick} />
             </TabsContent>
 
-            <TabsContent value="embeddings" className="flex-1 overflow-y-auto mt-0">
+            <TabsContent value="embeddings" className="flex-1 h-full overflow-y-auto mt-0">
               <EmbeddingsViewer
                 chunks={chunks}
                 chunksWithEmbeddings={chunksWithEmbeddings}
@@ -122,7 +122,7 @@ export function ResultsPanel({
               />
             </TabsContent>
 
-            <TabsContent value="summaries" className="flex-1 overflow-y-auto mt-0">
+            <TabsContent value="summaries" className="flex-1 h-full overflow-y-auto mt-0">
               <SummaryViewer
                 chunks={chunks}
                 summaries={summaries}
@@ -137,7 +137,7 @@ export function ResultsPanel({
               />
             </TabsContent>
 
-            <TabsContent value="stats" className="flex-1 overflow-y-auto mt-0">
+            <TabsContent value="stats" className="flex-1 h-full overflow-y-auto mt-0">
               <StatsDisplay stats={stats} />
             </TabsContent>
           </Tabs>

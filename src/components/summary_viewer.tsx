@@ -203,7 +203,7 @@ export function SummaryViewer({
         </div>
       </div>
 
-      <ScrollArea className="flex-1 p-1">
+      <ScrollArea className="flex-1 overflow-hidden">
         <div className="p-4 space-y-6">
           {isGenerating ? (
             <div className="flex items-center justify-center py-8">

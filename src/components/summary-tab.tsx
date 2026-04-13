@@ -1,6 +1,5 @@
 "use client"
 
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -33,6 +32,7 @@ interface SummaryTabProps {
   requiresApiKey?: boolean
   processingStep: string
   onRegenerateSummary: () => void
+  onSourceClick?: (chunkId: string) => void
 }
 
 export function SummaryTab({
@@ -44,16 +44,27 @@ export function SummaryTab({
   stats,
   requiresApiKey,
   processingStep,
+  onSourceClick,
 }: SummaryTabProps) {
   const busy = isGenerating || processingStep === "summarizing"
+
+  // Helper function to get page numbers for source chunks
+  const getSourcePageNumbers = (sourceChunkIds: string[]): Set<number> => {
+    const pages = new Set<number>()
+    sourceChunkIds.forEach((id) => {
+      const chunk = chunks.find((c) => c.id === id)
+      if (chunk) pages.add(chunk.pageNumber)
+    })
+    return pages
+  }
 
   if (chunks.length === 0 && processingStep === "idle") {
     return <EmptyState />
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <ScrollArea className="flex-1">
+    <div className="h-full w-full flex flex-col">
+      <div className="flex-1 overflow-y-auto">
         <div className="p-6 space-y-5">
           {busy && <LoadingState count={chunks.length} />}
 
@@ -118,6 +129,31 @@ export function SummaryTab({
                   <StatBadge icon={<Database className="h-3 w-3" />}>{stats.fromCache} cached</StatBadge>
                 )}
               </div>
+
+              {/* Source References */}
+              {finalSummary.sourceChunkIds.length > 0 && (
+                <div className="mt-4 pt-4 border-t">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Source pages:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Array.from(getSourcePageNumbers(finalSummary.sourceChunkIds)).map((pageNum) => (
+                      <button
+                        key={pageNum}
+                        onClick={() => {
+                          const sourceId = finalSummary.sourceChunkIds.find(
+                            (id) => chunks.find((c) => c.id === id)?.pageNumber === pageNum
+                          )
+                          if (sourceId && onSourceClick) onSourceClick(sourceId)
+                        }}
+                        className="inline-flex items-center gap-1 rounded-full border bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300 cursor-pointer transition-colors"
+                        title="Click to view in PDF"
+                      >
+                        <FileText className="h-3 w-3" />
+                        p.{pageNum}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -150,6 +186,30 @@ export function SummaryTab({
                         <StatBadge>{s.tokenCount} tokens</StatBadge>
                         <StatBadge>{s.sourceChunkIds.length} sources</StatBadge>
                       </div>
+                      {/* Source References for Intermediate Summaries */}
+                      {s.sourceChunkIds.length > 0 && (
+                        <div className="mt-3 pt-3 border-t">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Source pages:</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {Array.from(getSourcePageNumbers(s.sourceChunkIds)).map((pageNum) => (
+                              <button
+                                key={pageNum}
+                                onClick={() => {
+                                  const sourceId = s.sourceChunkIds.find(
+                                    (id) => chunks.find((c) => c.id === id)?.pageNumber === pageNum
+                                  )
+                                  if (sourceId && onSourceClick) onSourceClick(sourceId)
+                                }}
+                                className="inline-flex items-center gap-1 rounded-full border bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300 cursor-pointer transition-colors"
+                                title="Click to view in PDF"
+                              >
+                                <FileText className="h-3 w-3" />
+                                p.{pageNum}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </AccordionContent>
                   </AccordionItem>
                 ))}
@@ -161,7 +221,7 @@ export function SummaryTab({
             <PendingState count={chunks.length} />
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }

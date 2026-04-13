@@ -193,6 +193,16 @@ export default function Home() {
     }
   }, [chunks, clearSummaries, generateSummaries])
 
+  const handleSourceClick = useCallback(
+    (chunkId: string) => {
+      const chunk = chunks.find((c) => c.id === chunkId)
+      if (chunk) {
+        setCurrentPdfPage(chunk.pageNumber)
+      }
+    },
+    [chunks],
+  )
+
   const handleReprocess = useCallback(() => {
     if (!pdfFile) return
     extractTextFromPdf(pdfFile)
@@ -317,7 +327,7 @@ export default function Home() {
         )}
       </header>
 
-      <main className="container mx-auto px-4 py-6">
+      <main className="container mx-auto px-4 py-6 h-full overflow-y-auto">
         <div
           className="grid lg:grid-cols-2 gap-6"
           style={{ height: "calc(100vh - 120px)" }}
@@ -340,9 +350,9 @@ export default function Home() {
             )}
           </div>
 
-          <Card className="flex flex-col min-h-0 overflow-hidden rounded-2xl shadow-sm py-0 gap-0">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
-              <div className="border-b px-4 py-3 bg-background/60 backdrop-blur">
+          <Card className="flex flex-col h-full min-h-0 overflow-y-auto rounded-2xl shadow-sm py-0 gap-0">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full overflow-auto">
+              <div className="border-b px-4 py-3 bg-background/60 backdrop-blur overflow-auto">
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="summary">
                     <Sparkles className="h-3.5 w-3.5" />
@@ -357,7 +367,7 @@ export default function Home() {
                 </TabsList>
               </div>
 
-              <TabsContent value="summary" className="flex-1 overflow-hidden mt-0 min-h-0">
+              <TabsContent value="summary" className="h-full flex-1 overflow-hidden mt-0 min-h-0">
                 <SummaryTab
                   chunks={chunks}
                   summaries={summaries}
@@ -368,10 +378,11 @@ export default function Home() {
                   requiresApiKey={summaryRequiresApiKey}
                   processingStep={processingStep}
                   onRegenerateSummary={handleRegenerateSummary}
+                  onSourceClick={handleSourceClick}
                 />
               </TabsContent>
 
-              <TabsContent value="chat" className="flex-1 overflow-hidden mt-0 min-h-0">
+              <TabsContent value="chat" className="h-full flex-1 overflow-hidden mt-0 min-h-0">
                 <ChatTab enabled={chatEnabled} chunks={chunksWithEmbeddings} />
               </TabsContent>
             </Tabs>

@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import type { PDFDocumentProxy, PDFPageProxy, PDFPageViewport } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw } from "lucide-react"
-import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface PdfViewerProps {
   pdfDoc: PDFDocumentProxy | null
@@ -63,7 +62,6 @@ export function PdfViewer({ pdfDoc, fileUrl, currentPage, onPageChange, highligh
   useEffect(() => {
     if (highlightPage && highlightPage !== currentPage && highlightPage > 0 && highlightPage <= numPages) {
       onPageChange(highlightPage)
-      scrollAreaRef.current?.scrollTo({ top: 0, behavior: "smooth" })
     }
   }, [highlightPage, currentPage, numPages, onPageChange])
 
@@ -107,11 +105,11 @@ export function PdfViewer({ pdfDoc, fileUrl, currentPage, onPageChange, highligh
       </div>
 
       {/* Viewer */}
-      <ScrollArea className="flex-1 bg-gray-200 dark:bg-gray-700 p-4" ref={scrollAreaRef}>
-        <div className="flex justify-center items-start" ref={containerRef}>
-          <canvas ref={canvasRef} className="shadow-lg rounded max-w-full h-auto" />
+      <div className="flex-1 bg-gray-200 dark:bg-gray-700 p-4 overflow-auto" ref={scrollAreaRef}>
+        <div ref={containerRef}>
+          <canvas ref={canvasRef} className="shadow-lg rounded" style={{ display: 'block', width: 'auto', height: 'auto' }} />
         </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }
