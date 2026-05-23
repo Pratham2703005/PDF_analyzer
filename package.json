@@ -11,6 +11,7 @@
   "dependencies": {
     "@ai-sdk/mistral": "^3.0.30",
     "@ai-sdk/openai": "^3.0.52",
+    "@aws-sdk/client-lambda": "^3.726.0",
     "@prisma/client": "^6.10.1",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",

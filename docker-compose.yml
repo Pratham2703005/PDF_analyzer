@@ -1,0 +1,14 @@
+services:
+  localstack:
+    image: localstack/localstack:latest
+    container_name: pdf-analyzer-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=lambda
+      - DEBUG=0
+      - LAMBDA_EXECUTOR=docker
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - "//var/run/docker.sock:/var/run/docker.sock"
+      - "./lambda/pdf-extractor/target:/lambda-artifacts"

@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import type { TextItem } from "@/lib/types"
-import type { PDFDocumentProxy as PDFType} from "@/lib/types"
+import type { PDFDocumentProxy as PDFType } from "@/lib/types"
 
 import type * as PDFJS from "pdfjs-dist"
 
@@ -80,27 +79,36 @@ export function usePdfExtractor() {
           setPdfDoc(null)
         }
 
-        const arrayBuffer = await file.arrayBuffer()
-        const loadingTask = globalWindow.pdfjsLib.getDocument({
-          data: arrayBuffer,
-          cMapUrl: CMAP_URL,
-          cMapPacked: true,
-        })
-        const loadedPdfDoc = (await loadingTask.promise) as PDFType
+        const viewerPromise = file.arrayBuffer().then((buf) =>
+          globalWindow.pdfjsLib!
+            .getDocument({
+              data: buf,
+              cMapUrl: CMAP_URL,
+              cMapPacked: true,
+            })
+            .promise.then((doc) => doc as PDFType),
+        )
+
+        const extractionPromise = (async () => {
+          const formData = new FormData()
+          formData.append("file", file)
+          const res = await fetch("/api/v4/extract", {
+            method: "POST",
+            body: formData,
+          })
+          const json = await res.json()
+          if (!res.ok || !json.success) {
+            throw new Error(json.message || `Extraction failed (${res.status})`)
+          }
+          return json as { extractedText: string; numPages: number; fileName: string }
+        })()
+
+        const [loadedPdfDoc, extracted] = await Promise.all([viewerPromise, extractionPromise])
+
         setPdfDoc(loadedPdfDoc)
+        setExtractedText(extracted.extractedText)
 
-        let fullText = ""
-        for (let i = 1; i <= loadedPdfDoc.numPages; i++) {
-          const page = await loadedPdfDoc.getPage(i)
-          const content = await page.getTextContent()
-          const text = content.items.map((item) => (item as TextItem).str).join("\n")
-          fullText += text + "\n\n"
-        }
-
-        fullText = fullText.trim().replace(/(\n\s*){3,}/g, "\n\n")
-        setExtractedText(fullText)
-
-        if (!fullText) {
+        if (!extracted.extractedText) {
           setError("No text found in PDF.")
         }
       } catch (err) {
