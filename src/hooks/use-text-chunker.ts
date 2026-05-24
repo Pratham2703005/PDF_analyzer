@@ -2,30 +2,113 @@
 
 import { useState, useCallback } from "react"
 import { encode } from "gpt-tokenizer"
-import type { TextChunk, ChunkingStats } from "@/lib/types"
+import type { Block, TextChunk, ChunkingStats } from "@/lib/types"
 
-function splitByHeadings(text: string, fileName: string): { heading: string; content: string }[] {
-  const pattern = /^(\d+\.\s+.*)/gm
-  const sections = []
-  const matches = Array.from(text.matchAll(pattern))
+const MAX_TOKENS_PER_CHUNK = 800
 
-  if (matches.length > 0 && matches[0].index! > 0) {
-    const content = text.slice(0, matches[0].index!).trim()
-    if (content) sections.push({ heading: fileName, content })
+function tokenCount(text: string): number {
+  return encode(text).length
+}
+
+function wordCount(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length
+}
+
+function makeChunk(
+  id: number,
+  text: string,
+  pageNumber: number,
+  title: string,
+  level: number,
+): TextChunk {
+  const trimmed = text.trim()
+  return {
+    id: `chunk-${id}`,
+    text: trimmed,
+    pageNumber,
+    title,
+    level,
+    tokenCount: tokenCount(trimmed),
+    wordCount: wordCount(trimmed),
+  }
+}
+
+function packParagraphs(
+  paragraphs: { text: string; page: number }[],
+  startId: number,
+  title: string,
+  level: number,
+): TextChunk[] {
+  if (paragraphs.length === 0) return []
+  const out: TextChunk[] = []
+  let buf: { text: string; page: number }[] = []
+  let bufTokens = 0
+  let counter = startId
+
+  const flushBuf = () => {
+    if (buf.length === 0) return
+    const text = buf.map((p) => p.text).join("\n\n")
+    out.push(makeChunk(++counter, text, buf[0].page, title, level))
+    buf = []
+    bufTokens = 0
   }
 
-  for (let i = 0; i < matches.length; i++) {
-    const heading = matches[i][1].trim()
-    const startIndex = matches[i].index! + matches[i][0].length
-    const endIndex = i + 1 < matches.length ? matches[i + 1].index! : text.length
-    const content = text.slice(startIndex, endIndex).trim()
-    if (content) sections.push({ heading, content })
+  for (const para of paragraphs) {
+    const t = tokenCount(para.text)
+    if (t > MAX_TOKENS_PER_CHUNK) {
+      flushBuf()
+      out.push(makeChunk(++counter, para.text, para.page, title, level))
+      continue
+    }
+    if (bufTokens + t > MAX_TOKENS_PER_CHUNK && buf.length > 0) {
+      flushBuf()
+    }
+    buf.push(para)
+    bufTokens += t
+  }
+  flushBuf()
+  return out
+}
+
+function chunkFromBlocks(blocks: Block[], fileName: string): TextChunk[] {
+  const all: TextChunk[] = []
+  let currentTitle = fileName
+  let currentLevel = 0
+  let buffer: { text: string; page: number }[] = []
+
+  const flush = () => {
+    const packed = packParagraphs(buffer, all.length, currentTitle, currentLevel)
+    all.push(...packed)
+    buffer = []
   }
 
-  if (sections.length === 0 && text.trim()) {
-    sections.push({ heading: fileName, content: text.trim() })
+  for (const block of blocks) {
+    if (block.type === "heading") {
+      flush()
+      currentTitle = block.text
+      currentLevel = block.level ?? 1
+    } else {
+      buffer.push({ text: block.text, page: block.page })
+    }
   }
-  return sections
+  flush()
+  return all
+}
+
+function chunkFromFlatText(text: string, fileName: string, totalPages: number): TextChunk[] {
+  if (!text.trim()) return []
+  const paragraphs = text
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p, _, arr) => {
+      const idx = text.indexOf(p)
+      const page = totalPages > 0
+        ? Math.max(1, Math.ceil(((idx + 1) / text.length) * totalPages))
+        : 1
+      return { text: p, page }
+    })
+  return packParagraphs(paragraphs, 0, fileName, 0)
 }
 
 export function useTextChunker() {
@@ -33,143 +116,63 @@ export function useTextChunker() {
   const [stats, setStats] = useState<ChunkingStats | null>(null)
   const [isChunking, setIsChunking] = useState(false)
 
-  const chunkText = useCallback(async (textToChunk: string, fileName: string, totalPages = 0) => {
-    if (!textToChunk) {
-      setChunks([])
-      setStats(null)
-      return
+  const computeStats = useCallback((all: TextChunk[]): ChunkingStats | null => {
+    if (all.length === 0) return null
+    const totalChars = all.reduce((s, c) => s + c.text.length, 0)
+    const totalTokens = all.reduce((s, c) => s + c.tokenCount, 0)
+    const chunksByLevel: { [key: number]: number } = {}
+    const chunksByPage: { [key: number]: number } = {}
+    for (const c of all) {
+      chunksByLevel[c.level] = (chunksByLevel[c.level] || 0) + 1
+      chunksByPage[c.pageNumber] = (chunksByPage[c.pageNumber] || 0) + 1
     }
-
-    setIsChunking(true)
-
-    try {
-      const MAX_TOKENS_PER_CHUNK = 300
-      const allChunks: TextChunk[] = []
-      let chunkCounter = 0
-      const pageTracker: { [key: string]: number } = {}
-
-      const createChunk = (text: string, title: string, level: number, pageNum = 1): TextChunk => {
-        const trimmedText = text.trim()
-        const chunkId = `chunk-${++chunkCounter}`
-
-        // Track page distribution
-        if (!pageTracker[pageNum]) pageTracker[pageNum] = 0
-        pageTracker[pageNum]++
-
-        return {
-          id: chunkId,
-          text: trimmedText,
-          pageNumber: pageNum,
-          title,
-          level,
-          tokenCount: encode(trimmedText).length,
-          wordCount: trimmedText.split(/\s+/).length,
-        }
-      }
-
-      const groupSubsections = (units: string[], title: string, level: number, pageNum = 1): TextChunk[] => {
-        const groupedChunks: TextChunk[] = []
-        let currentChunkText = ""
-        for (const unit of units) {
-          const newChunk = currentChunkText ? currentChunkText + "\n\n" + unit : unit
-          if (encode(newChunk).length > MAX_TOKENS_PER_CHUNK) {
-            if (currentChunkText) groupedChunks.push(createChunk(currentChunkText, title, level, pageNum))
-            currentChunkText = unit
-          } else {
-            currentChunkText = newChunk
-          }
-        }
-        if (currentChunkText) groupedChunks.push(createChunk(currentChunkText, title, level, pageNum))
-        return groupedChunks
-      }
-
-      const sections = splitByHeadings(textToChunk, fileName)
-      let currentPage = 1
-
-      for (const section of sections) {
-        // Estimate page number based on text position
-        const sectionPosition = textToChunk.indexOf(section.content)
-        const estimatedPage = Math.max(1, Math.ceil((sectionPosition / textToChunk.length) * totalPages))
-        currentPage = estimatedPage
-
-        if (encode(section.content).length <= MAX_TOKENS_PER_CHUNK) {
-          allChunks.push(createChunk(section.content, section.heading, 1, currentPage))
-          continue
-        }
-
-        const paragraphs = section.content.split(/\n\s*\n/).filter((p) => p.trim())
-        const paragraphChunks = groupSubsections(paragraphs, section.heading, 2, currentPage)
-
-        for (const pChunk of paragraphChunks) {
-          if (pChunk.tokenCount <= MAX_TOKENS_PER_CHUNK) {
-            allChunks.push(pChunk)
-            continue
-          }
-
-          const sentences = pChunk.text.split(/(?<=[.!?])\s+/g).filter((s) => s.trim())
-          const sentenceChunks = groupSubsections(sentences, pChunk.title, 3, pChunk.pageNumber)
-
-          for (const sChunk of sentenceChunks) {
-            if (sChunk.tokenCount <= MAX_TOKENS_PER_CHUNK) {
-              allChunks.push(sChunk)
-              continue
-            }
-
-            const words = sChunk.text.split(/\s+/)
-            let currentText = ""
-            let part = 1
-            for (const word of words) {
-              const newText = currentText ? currentText + " " + word : word
-              if (encode(newText).length > MAX_TOKENS_PER_CHUNK) {
-                allChunks.push(createChunk(currentText, `${sChunk.title}.${part}`, 4, sChunk.pageNumber))
-                currentText = word
-                part++
-              } else {
-                currentText = newText
-              }
-            }
-            if (currentText) {
-              allChunks.push(createChunk(currentText, `${sChunk.title}.${part}`, 4, sChunk.pageNumber))
-            }
-          }
-        }
-      }
-
-      setChunks(allChunks)
-
-      if (allChunks.length > 0) {
-        const totalChars = allChunks.reduce((sum, c) => sum + c.text.length, 0)
-        const totalTokens = allChunks.reduce((sum, c) => sum + c.tokenCount, 0)
-
-        // Calculate level distribution
-        const chunksByLevel: { [key: number]: number } = {}
-        allChunks.forEach((chunk) => {
-          chunksByLevel[chunk.level] = (chunksByLevel[chunk.level] || 0) + 1
-        })
-
-        // Calculate page distribution
-        const chunksByPage: { [key: number]: number } = {}
-        allChunks.forEach((chunk) => {
-          chunksByPage[chunk.pageNumber] = (chunksByPage[chunk.pageNumber] || 0) + 1
-        })
-
-        setStats({
-          totalChunks: allChunks.length,
-          totalTokens,
-          averageChunkSize: totalChars / allChunks.length,
-          chunksByLevel,
-          chunksByPage,
-        })
-      } else {
-        setStats(null)
-      }
-    } catch (e) {
-      setChunks([])
-      setStats(null)
-    } finally {
-      setIsChunking(false)
+    return {
+      totalChunks: all.length,
+      totalTokens,
+      averageChunkSize: totalChars / all.length,
+      chunksByLevel,
+      chunksByPage,
     }
   }, [])
 
-  return { chunks, stats, isChunking, chunkText, setChunks, setStats }
+  const chunkBlocks = useCallback(
+    async (blocks: Block[], fileName: string) => {
+      setIsChunking(true)
+      try {
+        const all = chunkFromBlocks(blocks, fileName)
+        setChunks(all)
+        setStats(computeStats(all))
+      } catch {
+        setChunks([])
+        setStats(null)
+      } finally {
+        setIsChunking(false)
+      }
+    },
+    [computeStats],
+  )
+
+  const chunkText = useCallback(
+    async (textToChunk: string, fileName: string, totalPages = 0) => {
+      if (!textToChunk) {
+        setChunks([])
+        setStats(null)
+        return
+      }
+      setIsChunking(true)
+      try {
+        const all = chunkFromFlatText(textToChunk, fileName, totalPages)
+        setChunks(all)
+        setStats(computeStats(all))
+      } catch {
+        setChunks([])
+        setStats(null)
+      } finally {
+        setIsChunking(false)
+      }
+    },
+    [computeStats],
+  )
+
+  return { chunks, stats, isChunking, chunkBlocks, chunkText, setChunks, setStats }
 }

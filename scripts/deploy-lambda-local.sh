@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Deploy the pdf-extractor Lambda to LocalStack.
-# Requires: Maven, AWS CLI, LocalStack running on http://localhost:4566.
+# Deploy the pdf-extractor Lambda to ministack.
+# Requires: Maven, AWS CLI, ministack running on http://localhost:4566.
 
 set -euo pipefail
 
@@ -39,4 +39,4 @@ else
         --zip-file "fileb://$JAR_PATH"
 fi
 
-echo "Done. Function '$FUNCTION_NAME' deployed to LocalStack."
+echo "Done. Function '$FUNCTION_NAME' deployed to ministack."

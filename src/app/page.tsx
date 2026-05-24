@@ -30,13 +30,14 @@ export default function Home() {
     error: extractionError,
     fileName,
     extractedText,
+    blocks,
     pdfDoc,
     pdfFile,
     extractTextFromPdf,
     setError: setExtractionError,
   } = usePdfExtractor()
 
-  const { chunks, stats, isChunking, chunkText } = useTextChunker()
+  const { chunks, stats, isChunking, chunkBlocks, chunkText } = useTextChunker()
 
   const {
     chunksWithEmbeddings,
@@ -75,9 +76,13 @@ export default function Home() {
     if (extractedText && fileName && pdfDoc && processingStep === "extracting") {
       setProcessingStep("chunking")
       setProcessingProgress(25)
-      chunkText(extractedText, fileName, pdfDoc.numPages)
+      if (blocks.length > 0) {
+        chunkBlocks(blocks, fileName)
+      } else {
+        chunkText(extractedText, fileName, pdfDoc.numPages)
+      }
     }
-  }, [extractedText, fileName, pdfDoc, chunkText, processingStep])
+  }, [extractedText, blocks, fileName, pdfDoc, chunkBlocks, chunkText, processingStep])
 
   useEffect(() => {
     if (chunks.length > 0 && processingStep === "chunking" && !isChunking) {

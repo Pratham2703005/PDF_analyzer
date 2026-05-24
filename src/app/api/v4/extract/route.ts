@@ -1,10 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda"
+import type { Block } from "@/lib/types"
 
 export interface ExtractResponse {
   extractedText: string
   numPages: number
   fileName: string
+  blocks: Block[]
   success: boolean
   message?: string
 }
@@ -83,6 +85,7 @@ export async function POST(request: NextRequest) {
         extractedText: payload.extractedText ?? "",
         numPages: payload.numPages ?? 0,
         fileName: payload.fileName ?? file.name,
+        blocks: Array.isArray(payload.blocks) ? payload.blocks : [],
         success: true,
       },
       { status: 200 },

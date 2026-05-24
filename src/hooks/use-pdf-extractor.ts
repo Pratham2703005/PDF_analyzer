@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import type { PDFDocumentProxy as PDFType } from "@/lib/types"
+import type { Block, PDFDocumentProxy as PDFType } from "@/lib/types"
 
 import type * as PDFJS from "pdfjs-dist"
 
@@ -15,6 +15,7 @@ export function usePdfExtractor() {
   const [error, setError] = useState("")
   const [fileName, setFileName] = useState("")
   const [extractedText, setExtractedText] = useState("")
+  const [blocks, setBlocks] = useState<Block[]>([])
   const [pdfDoc, setPdfDoc] = useState<PDFType | null>(null)
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const pdfDocRef = useRef<PDFType | null>(null)
@@ -70,6 +71,7 @@ export function usePdfExtractor() {
       setIsLoading(true)
       setError("")
       setExtractedText("")
+      setBlocks([])
       setFileName(file.name)
       setPdfFile(file)
 
@@ -100,13 +102,19 @@ export function usePdfExtractor() {
           if (!res.ok || !json.success) {
             throw new Error(json.message || `Extraction failed (${res.status})`)
           }
-          return json as { extractedText: string; numPages: number; fileName: string }
+          return json as {
+            extractedText: string
+            numPages: number
+            fileName: string
+            blocks: Block[]
+          }
         })()
 
         const [loadedPdfDoc, extracted] = await Promise.all([viewerPromise, extractionPromise])
 
         setPdfDoc(loadedPdfDoc)
         setExtractedText(extracted.extractedText)
+        setBlocks(Array.isArray(extracted.blocks) ? extracted.blocks : [])
 
         if (!extracted.extractedText) {
           setError("No text found in PDF.")
@@ -132,6 +140,7 @@ export function usePdfExtractor() {
     error,
     fileName,
     extractedText,
+    blocks,
     pdfDoc,
     pdfFile,
     extractTextFromPdf,

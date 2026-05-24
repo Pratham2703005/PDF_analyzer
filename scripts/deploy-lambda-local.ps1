@@ -1,5 +1,5 @@
-# Deploy the pdf-extractor Lambda to LocalStack.
-# Requires: Maven, AWS CLI, LocalStack running on http://localhost:4566.
+# Deploy the pdf-extractor Lambda to ministack.
+# Requires: Maven, AWS CLI, ministack running on http://localhost:4566.
 
 $ErrorActionPreference = "Stop"
 
@@ -51,4 +51,4 @@ if ($exists) {
         --zip-file "fileb://$JarPath"
 }
 
-Write-Host "Done. Function '$FunctionName' deployed to LocalStack."
+Write-Host "Done. Function '$FunctionName' deployed to ministack."

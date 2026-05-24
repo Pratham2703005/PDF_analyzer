@@ -11,6 +11,13 @@ export interface TextChunk {
   fromCache?: boolean // Whether embedding was loaded from cache
 }
 
+export interface Block {
+  type: "heading" | "paragraph"
+  text: string
+  page: number
+  level?: number
+}
+
 export interface ChunkingStats {
   totalChunks: number
   totalTokens: number
